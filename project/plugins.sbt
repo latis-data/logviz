@@ -1,0 +1,5 @@
+addSbtPlugin("se.marcuslonnberg" % "sbt-docker" % "1.11.0")
+addSbtPlugin("io.spray" % "sbt-revolver" % "0.10.0")
+addSbtPlugin("org.scala-js" % "sbt-scalajs" % "1.19.0")
+addSbtPlugin("org.portable-scala" % "sbt-scalajs-crossproject" % "1.3.2")
+addSbtPlugin("org.typelevel" % "sbt-tpolecat" % "0.5.2")

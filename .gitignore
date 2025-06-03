@@ -1,0 +1,9 @@
+.bloop
+.bsp
+.metals
+project/project/
+target/
+
+# This file is an artifact from the frontend module that is copied
+# here for the purposes of running locally.
+modules/backend/src/main/resources/main.js

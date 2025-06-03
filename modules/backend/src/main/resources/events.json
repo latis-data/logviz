@@ -1,0 +1,8 @@
+[
+    {
+        "event": "hello"
+    },
+    {
+        "event": "world"
+    }
+]
