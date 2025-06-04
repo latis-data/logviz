@@ -1,6 +1,6 @@
 package latis.logviz
 
-import scala.concurrent.duration.FiniteDuration.*
+import scala.concurrent.duration.*
 
 import cats.effect.IO
 import cats.effect.IOApp
