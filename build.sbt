@@ -17,6 +17,7 @@ val commonSettings = Seq(
 lazy val root = project
   .in(file("."))
   .aggregate(
+    app,
     backend,
     frontend,
     shared.js,
