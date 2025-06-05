@@ -12,8 +12,14 @@ class EventComponent(events: List[Event]) {
   def render: Resource[IO, HtmlElement[IO]] =
     div(
       events.traverse {
-        case Event.Hello => p("hello")
-        case Event.World => p("world")
+        case Event.Start(t)      => p(s"Server (re)started at time $t")
+        case Event.Request(t, r) => p(s"Request of $r at time $t")
+        case Event.Response(t, s) =>
+          p(s"Response with status code $s at time $t")
+        case Event.Success(t, d) =>
+          p(s"Outcome success at time $t. Total time took: $d")
+        case Event.Failure(t, m) =>
+          p(s"Outcome failure at time $t. Message: $m")
       }
     )
 }
