@@ -1,8 +1,21 @@
 [
     {
-        "event": "hello"
+        "eventType": "Server",
+        "time": 0
     },
     {
-        "event": "world"
+        "eventType": "Request",
+        "time": 1,
+        "request": "example.csv?time%3>=2025-01-03&time%<=2025-01-05"
+    },
+    {
+        "eventType": "Response",
+        "time": 2,
+        "status": 202
+    },
+    {
+        "eventType": "Success",
+        "time": 4,
+        "duration": 2
     }
 ]
