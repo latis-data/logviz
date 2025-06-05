@@ -4,8 +4,8 @@ import cats.syntax.all.*
 import io.circe.Decoder
 import io.circe.DecodingFailure
 
-enum Event { //can you extend an enum? prevent
-  case Server(time: Long) 
+enum Event {
+  case Start(time: Long) 
   case Request(time: Long, request: String)
   case Response(time: Long, status: Int)
   case Success(time: Long, duration: Long) 
@@ -16,8 +16,8 @@ object Event {
   given Decoder[Event] = Decoder.instance { cursor =>
     val ev = cursor.downField("eventType")
     ev.as[String].flatMap {
-      case "Server" => 
-        cursor.downField("time").as[Long].map(t => Server(t)) //map will only apply if it's a right
+      case "Start" => 
+        cursor.downField("time").as[Long].map(t => Start(t))
       
       case "Request" => 
         for {

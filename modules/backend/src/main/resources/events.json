@@ -1,6 +1,6 @@
 [
     {
-        "eventType": "Server",
+        "eventType": "Start",
         "time": 0
     },
     {
@@ -9,13 +9,13 @@
         "request": "example.csv?time%3>=2025-01-03&time%<=2025-01-05"
     },
     {
-        "eventType": "Response",
-        "time": 2,
-        "status": 202
+        "eventType": "Success",
+        "time": 3,
+        "duration": 2
     },
     {
-        "eventType": "Success",
+        "eventType": "Failure",
         "time": 4,
-        "duration": 2
+        "msg": "ERROR"
     }
 ]
