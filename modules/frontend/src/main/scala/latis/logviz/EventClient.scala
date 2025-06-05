@@ -11,11 +11,24 @@ import org.http4s.client.Client
 
 import latis.logviz.model.Event
 
+/** EventClient used to return stream of events */
 trait EventClient {
   def getEvents: Stream[IO, Event]
 }
 
 object EventClient {
+  
+  /** 
+    * Creates EventClient
+    * 
+    * Creates baseURI @example localhost:8080 
+    * 
+    * EntityDecoder used to decode JSON which is defined in Event
+    * 
+    * Create an EventClient instance to expect a list of events after decoding event.json
+    * 
+    * @param http Client from http4s [[https://http4s.github.io/http4s-dom/fetch.html]]
+    */
   def fromHttpClient(http: Client[IO]): IO[EventClient] =
     (
       Window[IO].location.protocol.get,
