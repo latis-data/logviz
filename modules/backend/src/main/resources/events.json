@@ -1,21 +1,103 @@
 [
     {
         "eventType": "Start",
-        "time": 0
+        "time": "2025-07-16 14:00:00"
     },
     {
         "eventType": "Request",
-        "time": 1,
+        "id": "0",
+        "time": "2025-07-16 14:01:00",
         "request": "example.csv?time%3>=2025-01-03&time%<=2025-01-05"
     },
     {
+        "eventType": "Response",
+        "id": "0",
+        "time": "2025-07-16 14:01:01",
+        "status": 202
+    },
+    {
         "eventType": "Success",
-        "time": 3,
-        "duration": 2
+        "id": "0",
+        "time": "2025-07-16 14:03:10",
+        "duration": 129 
+    },
+    {
+       	"eventType": "Request",
+      	"id": "1",
+      	"time": "2025-07-16 14:05:49",
+	    "request": "bad request example"	
+    },
+    {
+    	"eventType": "Response",
+        "id": "1",
+        "time": "2025-07-16 14:05:50",
+        "status": 404
+    },
+    { 
+        "eventType": "Request",
+        "id": "2",
+        "time": "2025-07-16 14:12:50",
+        "request": "example3"
+    
+    }, 
+    {
+    	"eventType": "Response",
+        "id": "2",
+        "time": "2025-07-16 14:12:51",
+        "status": 202
+    
+    },
+    {	
+        "eventType": "Request",
+        "id": "3",
+        "time": "2025-07-16 14:20:30",
+        "request": "example4"
+    
+    }, 
+    {
+    	"eventType": "Response",
+        "id": "3",
+        "time": "2025-07-16 14:20:31",
+        "status": 202
+    
+    },
+    {
+    	"eventType": "Success",
+        "id": "2",
+        "time": "2025-07-16 14:27:20",
+        "duration": 270
+    },
+    {
+    	"eventType": "Success",
+        "id": "3",
+        "time": "2025-07-16 14:14:30",
+        "duration": 60
+    },
+    {
+        "eventType": "Request",
+        "id": "4",
+        "time": "2025-07-16 14:32:04",
+        "request": "example5 fail case"
+    
+    }, 
+    {
+    	"eventType": "Response",
+        "id": "4",
+        "time": "2025-07-16 14:32:05",
+        "status": 202
+        
     },
     {
         "eventType": "Failure",
-        "time": 4,
-        "msg": "ERROR"
+        "id": "4",
+        "time": "2025-07-16 14:37:34", 
+        "msg": "something went wrong"
+    },
+    {
+        "eventType": "Request",
+        "id": "5",
+        "time": "2025-07-16 17:29:04",
+        "request": "example6 incomplete case"
+    
     }
 ]
