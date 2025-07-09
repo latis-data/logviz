@@ -26,5 +26,10 @@ object LogvizRoutes extends Http4sDsl[IO] {
 
     case req @ GET -> Root / "events.json" =>
       StaticFile.fromResource("events.json", req.some).getOrElseF(NotFound())
+
+    case req @ GET -> Root / "styles.css" =>
+      StaticFile.fromResource("styles.css", req.some).getOrElseF(NotFound())
+
+    
   }
 }

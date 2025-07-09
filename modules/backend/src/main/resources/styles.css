@@ -1,0 +1,32 @@
+#container
+{
+    display: flex;
+    flex-direction: column;
+    height:100vh;
+}
+
+#timeline
+{
+    display: flex;
+    height: 70%;
+    overflow: auto;
+    padding: 40px;
+}
+
+#bottom-panel
+{
+    display: flex;
+    flex: 1;
+}
+
+#header
+{
+    display: flex;
+    height: 5%;
+}
+
+#canvas
+{
+    width: 1246px;
+    height: 10000px;
+}
