@@ -21,7 +21,8 @@ lazy val root = project
     backend,
     frontend,
     shared.js,
-    shared.jvm
+    shared.jvm,
+    splunk
   )
 
 lazy val app = project
@@ -80,6 +81,18 @@ lazy val shared = crossProject(JSPlatform, JVMPlatform)
   .settings(
     libraryDependencies ++= Seq(
       "io.circe" %%% "circe-core" % "0.14.13"
+    )
+  )
+
+lazy val splunk = project
+  .in(file("modules/splunk"))
+  .dependsOn(shared.jvm)
+  .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.typelevel" %%% "cats-core" % catsVersion,
+      "org.typelevel" %%% "cats-effect" % catsEffectVersion,
+      "co.fs2" %%% "fs2-core" % fs2Version
     )
   )
 
