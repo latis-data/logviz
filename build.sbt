@@ -6,6 +6,7 @@ val catsEffectVersion = "3.6.1"
 val fs2Version = "3.12.0"
 val http4sVersion = "0.23.30"
 val log4catsVersion = "2.7.1"
+val circeVersion = "0.14.13"
 
 val commonSettings = Seq(
   scalacOptions -= "-Xfatal-warnings",
@@ -80,7 +81,7 @@ lazy val shared = crossProject(JSPlatform, JVMPlatform)
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe" %%% "circe-core" % "0.14.13"
+      "io.circe" %%% "circe-core" % circeVersion
     )
   )
 
@@ -92,7 +93,14 @@ lazy val splunk = project
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % catsVersion,
       "org.typelevel" %%% "cats-effect" % catsEffectVersion,
-      "co.fs2" %%% "fs2-core" % fs2Version
+      "io.circe" %%% "circe-core" % circeVersion,
+      "io.circe" %%% "circe-generic" % circeVersion,
+      "io.circe" %%% "circe-parser" % circeVersion,
+      "co.fs2" %%% "fs2-core" % fs2Version,
+      "org.http4s" %%% "http4s-circe" % http4sVersion,
+      "org.http4s" %%% "http4s-dsl" % http4sVersion,
+      "org.http4s" %%% "http4s-ember-client" % http4sVersion,
+      "ch.qos.logback" % "logback-classic" % "1.5.18"
     )
   )
 
