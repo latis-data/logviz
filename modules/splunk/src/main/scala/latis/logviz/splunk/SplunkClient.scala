@@ -5,7 +5,6 @@ import cats.effect.IOApp
 import cats.effect.Resource
 import fs2.Stream
 import io.circe.Json
-import io.circe.generic.auto.*
 import java.io.* // for file writing
 import scala.io.StdIn.readLine 
 import org.http4s.circe.*
@@ -14,13 +13,7 @@ import org.http4s.*
 import org.typelevel.ci.CIString
 import scala.concurrent.duration.*
 
-import latis.logviz.model.Event // importing Event.scala
-
-// TODO: use these to parse Json through logviz event data model
-// case class Message(`type`: String, text: String)
-// case class Field(name: String)
-// case class Results(_bkt: String, _cd: String, _indextime: String, _raw: String, _serial: String, _si: List[String], _sourcetype: String, _subsecond: String, _time: String, host: String, index: String, linecount: String, source: String, sourcetype: String, splunk_server: String)
-// case class JsonResponse(preview: Boolean, init_offset: Int, messages: List[Message], fields: List[Field], results: List[Results], hightlighted: Option[Json])
+import latis.logviz.model.Event
 
 trait SplunkClient {
   // Methods for querying Splunk
@@ -29,19 +22,16 @@ trait SplunkClient {
   def checkQuery(sessionkey: String, sid: String): IO[Int]
   def waitLoop(sessionkey: String, sid: String): IO[Unit]
   def getResults(sessionkey: String, sid: String): IO[Json]
-  def makeStream(response: Json): IO[Stream[IO, SplunkMessage]]
+  def makeStream(response: Json): IO[Stream[IO, Event]]
 }
 
-object SplunkClient { // the companion object stores static fields and methods
+object SplunkClient {
   def make(/* config */): Resource[IO, SplunkClient] = {
-    // Some work here to initialize the client. (Making HTTP client,
-    // etc.)
     EmberClientBuilder
       .default[IO]
       .build
       .map { client => 
-        new SplunkClient { // new SplunkClient { ... }
-
+        new SplunkClient {
           val splunkuri: Uri = Uri.fromString(sys.env("SPLUNK_URI")).getOrElse(throw new RuntimeException("Invalid SPLUNK_URI"))
 
           // TODO: Should I use IO.blocking for readline()?
@@ -136,7 +126,7 @@ object SplunkClient { // the companion object stores static fields and methods
               uri = (splunkuri / "services" / "search" / "jobs" / sid / "events") // use /results if we want transformed events (performing stats or operations on events)
                 .withQueryParam("output_mode", "json")
                 .withQueryParam("offset", "0") // index of the first result to return
-                .withQueryParam("count", "5") // maximum number of results to return
+                .withQueryParam("count", "100") // maximum number of results to return
             ).putHeaders(
               Header.Raw(CIString("Authorization"), s"Splunk $sessionkey")
             ) 
@@ -151,42 +141,53 @@ object SplunkClient { // the companion object stores static fields and methods
             }
           }
 
-          def makeStream(response: Json): IO[Stream[IO, SplunkMessage]] = {
-            // TODO: need to parse the Json response into separate events
+          def makeStream(response: Json): IO[Stream[IO, Event]] = {
+            // making a stream of messages
             val decodedResult = response.hcursor.downField("results").as[List[SplunkMessage]]
-            decodedResult match {
+            val mStrm: Stream[IO, SplunkMessage] = decodedResult match {
               case Right(messages) => 
-                // messages.foreach(println)
-                IO.pure(Stream.emits(messages).covary[IO])
+                Stream.emits(messages).covary[IO]
               case Left(error) =>
-                IO.raiseError(new Exception(s"Error parsing Json into Stream with error: $error"))
+                Stream.raiseError(new Exception(s"Error parsing Json into Stream with error: $error"))
             }
 
-            // TODO: figure out how circe works
-            // scala-cli --dep io.circe::circe-core:0.14.14 repl
-            // Read, eval, print, loop
-            // less fancy version of a notebook
+            val getEvent: SplunkMessage => Option[Event] = (m: SplunkMessage) => {
+              val line: String = m.hcursor.downField("line").as[String].getOrElse("unknown")
 
-            
-            // TODO: Splunk response -> stream of Message -> stream of Event
-            // for each page, produce a chunk of messages (what is the log message which you need to decode from Json)
-            // stream of log messages, then look for the stuff below
+              // using contains method -- is there a better way to do this?
+              if line.contains("HTTP/1.1 GET") then
+                val spl = line.split("HTTP/1.1 GET")
+                val id = spl(0).split("request-id=")(1).dropRight(3)
+                val time = spl(0).split(" INFO")(0).drop(1)
+                val request = line.split("HTTP/1.1 GET")(1).drop(1)
+                Some(Event.Request(id, time, request))
+              else if line.contains("HTTP/1.1 ") then
+                val spl = line.split("HTTP/1.1 ")
+                val id = spl(0).split("request-id=")(1).dropRight(3)
+                val time = spl(0).split(" INFO")(0).drop(1)
+                val status = spl(1).split(" OK")(0).toInt
+                Some(Event.Response(id, time, status))
+              else if line.contains("Elapsed ") then
+                val spl = line.split("Elapsed ")
+                val id = spl(0).split("request-id=")(1).dropRight(3)
+                val time = spl(0).split(" INFO")(0).drop(1)
+                val duration = spl(1).split("source")(0).drop(6).toInt
+                Some(Event.Success(id, time, duration))
+              else if line.contains("Ember-Server service bound to address:") then
+                val time = line.split(" INFO")(0).drop(1)
+                Some(Event.Start(time))
+              else if line.contains("request failed: ") then
+                // TODO: an example of full output to finish implementing this
+                val id = "unknown"
+                val time = "unknown"
+                val msg = line.split("request failed: ")(1)
+                Some(Event.Failure(id, time, msg))
+              else
+                None
+            }
 
-            // in general, everything after this is the string message that we want
-
-            /** HTTP/1.1 GET   - request
-              * HTTP/1.1 200   - response
-              * ERROR, Failed, failed - failure -> Request failed: ""
-              * everything else - success -> Elapsed (ms): 27
-              * for start -> Ember-Server service bound to address -> just get time (unix time)
-              * any message that doesn't match these just ignore for now -- make a counter for these?
-              */
-
-              // write in terms of a pipeline: we have our splunk response
-              // between stream of messages, stream of events
-              // write a function Message => Option[Event]
-              // messageStream.map(messageParseFunction).unNone (dont use these names though)
-              // a cursor is immutable
+            val eStrm: Stream[IO, Event] = mStrm.map(getEvent).unNone
+            IO.pure(eStrm)
           }
         }
       }
@@ -202,7 +203,7 @@ object app extends IOApp.Simple {
         done       <- sclient.waitLoop(sessionkey, sid) // Step 3: Check the status of a query
         res        <- sclient.getResults(sessionkey, sid) // Step 4: Get the results from the query
         strm       <- sclient.makeStream(res) // making a stream of log events
-        _          <- strm.compile.drain // TODO: to make the stream effectful
+        _          <- strm.compile.drain // TODO: to make the stream effectful - execute the stream and discard the results
         _          <- IO.println("Finished...")
       } yield ()
     }
