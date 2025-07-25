@@ -1,6 +1,5 @@
 package latis.logviz.splunk
 
-import cats.syntax.all.*
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Json
@@ -11,6 +10,10 @@ opaque type SplunkMessage = Json
 object SplunkMessage:
     //def apply(s: List[Json]): List[SplunkMessage] = s
     def apply(s: Json): SplunkMessage = s
+    
+    extension (m: SplunkMessage)
+      def hcursor = m.hcursor
+      
 end SplunkMessage 
 
 given Decoder[SplunkMessage] = Decoder.instance { cursor => // defining how to decode a JSON value into a list of SplunkMessage
