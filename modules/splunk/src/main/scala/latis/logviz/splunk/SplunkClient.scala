@@ -21,7 +21,8 @@ trait SplunkClient {
   def generateQuery(sessionkey: String): IO[String]
   def checkQuery(sessionkey: String, sid: String): IO[Int]
   def waitLoop(sessionkey: String, sid: String): IO[Unit]
-  def getResults(sessionkey: String, sid: String): IO[Json]
+  def getTotalResults(sessionkey: String, sid: String): IO[Int]
+  def getResults(sessionkey: String, sid: String, total: Int): IO[Json]
   def makeStream(response: Json): IO[Stream[IO, Event]]
 }
 
@@ -120,7 +121,23 @@ object SplunkClient {
             } yield ()
           }
 
-          def getResults(sessionkey: String, sid: String): IO[Json] = {
+          def getTotalResults(sessionkey: String, sid: String): IO[Int] = {
+            // TODO: is there an easier way to get the total number of requests?
+            val request = Request[IO](
+              method = Method.GET,
+              uri = splunkuri / "services" / "search" / "jobs" / sid
+            ).putHeaders(
+              Header.Raw(CIString("Authorization"), s"Splunk $sessionkey")
+            )
+            client.expect[String](request).flatMap{response =>
+              val total: Int = response.split("resultCount")(1).split("resultIsStreaming")(0).split("<")(0).drop(2).toInt
+              IO.pure(total)
+            }
+          }
+
+          def getResults(sessionkey: String, sid: String, total: Int): IO[Json] = {
+            // TODO: Make a loop to continually get results until the amount of results returned is less than offset
+
             val request = Request[IO](
               method = Method.GET,
               uri = (splunkuri / "services" / "search" / "jobs" / sid / "events") // use /results if we want transformed events (performing stats or operations on events)
@@ -130,8 +147,6 @@ object SplunkClient {
             ).putHeaders(
               Header.Raw(CIString("Authorization"), s"Splunk $sessionkey")
             ) 
-
-            // TODO: Make a loop to continually get results until the amount of results returned is less than offset
 
             client.expect[Json](request).flatMap{response =>
               val fileWriter = new FileWriter(new File("output.txt"))
@@ -201,7 +216,8 @@ object app extends IOApp.Simple {
         sessionkey <- sclient.getSessionKey // Step 1: Get a session key
         sid        <- sclient.generateQuery(sessionkey) // Step 2: Generate a query
         done       <- sclient.waitLoop(sessionkey, sid) // Step 3: Check the status of a query
-        res        <- sclient.getResults(sessionkey, sid) // Step 4: Get the results from the query
+        total      <- sclient.getTotalResults(sessionkey, sid)
+        res        <- sclient.getResults(sessionkey, sid, total) // Step 4: Get the results from the query
         strm       <- sclient.makeStream(res) // making a stream of log events
         _          <- strm.compile.drain // TODO: to make the stream effectful - execute the stream and discard the results
         _          <- IO.println("Finished...")
