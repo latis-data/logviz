@@ -35,8 +35,8 @@ object SplunkClient {
         new SplunkClient {
           val splunkuri: Uri = Uri.fromString(sys.env("SPLUNK_URI")).getOrElse(throw new RuntimeException("Invalid SPLUNK_URI"))
 
-          // TODO: Should I use IO.blocking for readline()?
           def getSessionKey: IO[String] = {
+            // TODO: Should I use IO.blocking for readline()?
             print("Username: ")
             val username = readLine()
             print("Password: ")
@@ -61,8 +61,6 @@ object SplunkClient {
           }
 
           def generateQuery(sessionkey: String): IO[String] = {
-            // print("Input a query: ")
-            // val query = "search " + readLine()
             val query = "search index=latis source=latis3-swp* earliest_time=-24h@h latest_time=now"
 
             val request = Request[IO](
@@ -83,7 +81,6 @@ object SplunkClient {
           }
 
           def checkQuery(sessionkey: String, sid: String): IO[Int] = {
-            // TODO: implement failing cases and tests
             val request = Request[IO](
               method = Method.GET,
               uri = splunkuri / "services" / "search" / "jobs" / sid
@@ -92,22 +89,18 @@ object SplunkClient {
             )
 
             client.expect[String](request).flatMap{response =>
-              // <s:key name="dispatchState">RUNNING</s:key>
-              // <s:key name="isDone">0</s:key>
-              // <s:key name="isFailed">0</s:key>
-              
               // parsing to get dispatchState
-              val state = response.split("dispatchState")(1).split("doneProgress")(0).split("<")(0).drop(2)
-              println(s"State: $state")
+              // val state = response.split("dispatchState")(1).split("doneProgress")(0).split("<")(0).drop(2)
+              // println(s"State: $state")
 
               // parsing to get isDone boolean
               val done: Int = response.split("isDone")(1).split("isEventsPreviewEnabled")(0).split("<")(0).drop(2).toInt
-              println(s"Done: $done")
+              //println(s"Done: $done")
 
               // parsing to get isFailed boolean
-              val failed: Int = response.split("isFailed")(1).split("isFinalized")(0).split("<")(0).drop(2).toInt
-              println(s"Failed: $failed")
-              print("\n")
+              // val failed: Int = response.split("isFailed")(1).split("isFinalized")(0).split("<")(0).drop(2).toInt
+              // println(s"Failed: $failed")
+              // print("\n")
 
               IO.pure(done)
             }
@@ -122,14 +115,15 @@ object SplunkClient {
           }
 
           def getTotalResults(sessionkey: String, sid: String): IO[Int] = {
-            // TODO: is there an easier way to get the total number of requests?
             val request = Request[IO](
               method = Method.GET,
               uri = splunkuri / "services" / "search" / "jobs" / sid
             ).putHeaders(
               Header.Raw(CIString("Authorization"), s"Splunk $sessionkey")
             )
+
             client.expect[String](request).flatMap{response =>
+              // println(response)
               val total: Int = response.split("resultCount")(1).split("resultIsStreaming")(0).split("<")(0).drop(2).toInt
               IO.pure(total)
             }
@@ -137,13 +131,18 @@ object SplunkClient {
 
           def getResults(sessionkey: String, sid: String, total: Int): IO[Json] = {
             // TODO: Make a loop to continually get results until the amount of results returned is less than offset
+            println(s"Parsing $total results...")
 
+            // What should the loop be set to? Maximum requests per iteration
+            // 10,000?
+            // Continually write to the same file to check that all responses are being handled
+  
             val request = Request[IO](
               method = Method.GET,
               uri = (splunkuri / "services" / "search" / "jobs" / sid / "events") // use /results if we want transformed events (performing stats or operations on events)
                 .withQueryParam("output_mode", "json")
                 .withQueryParam("offset", "0") // index of the first result to return
-                .withQueryParam("count", "100") // maximum number of results to return
+                .withQueryParam("count", s"$total") // maximum number of results to return
             ).putHeaders(
               Header.Raw(CIString("Authorization"), s"Splunk $sessionkey")
             ) 
@@ -191,16 +190,17 @@ object SplunkClient {
               else if line.contains("Ember-Server service bound to address:") then
                 val time = line.split(" INFO")(0).drop(1)
                 Some(Event.Start(time))
-              else if line.contains("request failed: ") then
-                // TODO: an example of full output to finish implementing this
+              else if line.contains("Request failed") then
+                val spl = line.split(" ERROR")
                 val id = "unknown"
-                val time = "unknown"
-                val msg = line.split("request failed: ")(1)
+                val time = spl(0).drop(1)
+                val msg = "unknown"
                 Some(Event.Failure(id, time, msg))
               else
                 None
             }
 
+            // stream of messages -> stream of events
             val eStrm: Stream[IO, Event] = mStrm.map(getEvent).unNone
             IO.pure(eStrm)
           }
@@ -211,7 +211,7 @@ object SplunkClient {
 
 object app extends IOApp.Simple {
   override def run: IO[Unit] = {
-    SplunkClient.make().use { sclient => // creating a resource and then using it
+    SplunkClient.make().use { sclient =>
       for {
         sessionkey <- sclient.getSessionKey // Step 1: Get a session key
         sid        <- sclient.generateQuery(sessionkey) // Step 2: Generate a query
@@ -219,8 +219,8 @@ object app extends IOApp.Simple {
         total      <- sclient.getTotalResults(sessionkey, sid)
         res        <- sclient.getResults(sessionkey, sid, total) // Step 4: Get the results from the query
         strm       <- sclient.makeStream(res) // making a stream of log events
-        _          <- strm.compile.drain // TODO: to make the stream effectful - execute the stream and discard the results
-        _          <- IO.println("Finished...")
+        _          <- strm.compile.drain // to make the stream effectful - execute the stream and discard the results
+        _          <- IO.println("Finished!")
       } yield ()
     }
   }
