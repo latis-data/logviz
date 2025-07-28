@@ -100,7 +100,9 @@ lazy val splunk = project
       "org.http4s" %%% "http4s-circe" % http4sVersion,
       "org.http4s" %%% "http4s-dsl" % http4sVersion,
       "org.http4s" %%% "http4s-ember-client" % http4sVersion,
-      "ch.qos.logback" % "logback-classic" % "1.5.18"
+      "ch.qos.logback" % "logback-classic" % "1.5.18", // java library
+      "com.github.pureconfig" %%% "pureconfig-core" % "0.17.9",
+      "com.github.pureconfig" %%% "pureconfig-cats-effect" % "0.17.9"
     )
   )
 
