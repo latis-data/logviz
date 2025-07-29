@@ -1,7 +1,6 @@
 package latis.logviz.splunk
 
 import pureconfig.ConfigReader
-import pureconfig.generic.derivation.default.*
 
 case class SplunkConfig(
   uri: String,
