@@ -8,7 +8,6 @@ import io.circe.parser
 opaque type SplunkMessage = Json
 
 object SplunkMessage:
-    //def apply(s: List[Json]): List[SplunkMessage] = s
     def apply(s: Json): SplunkMessage = s
     
     extension (m: SplunkMessage)
@@ -16,8 +15,7 @@ object SplunkMessage:
       
 end SplunkMessage 
 
-given Decoder[SplunkMessage] = Decoder.instance { cursor => // defining how to decode a JSON value into a list of SplunkMessage
-  // Pull out the _raw bit, find the message in there
+given Decoder[SplunkMessage] = Decoder.instance { cursor =>
   for {
     raw <- cursor.downField("_raw").as[String]
     parsed <- parser.parse(raw).left.map(err =>
