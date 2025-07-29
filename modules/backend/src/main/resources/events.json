@@ -1,103 +1,194 @@
 [
     {
         "eventType": "Start",
-        "time": "2025-07-16 14:00:00"
+        "time": "2025-07-29 14:00:00"
     },
     {
         "eventType": "Request",
         "id": "0",
-        "time": "2025-07-16 14:01:00",
+        "time": "2025-07-29 14:01:00",
         "request": "example.csv?time%3>=2025-01-03&time%<=2025-01-05"
     },
     {
         "eventType": "Response",
         "id": "0",
-        "time": "2025-07-16 14:01:01",
+        "time": "2025-07-29 14:01:01",
+        "status": 202
+    },
+    {
+        "eventType": "Request",
+        "id": "1",
+        "time": "2025-07-29 14:02:00",
+        "request": "test overlapping!!"
+    },
+    {
+        "eventType": "Response",
+        "id": "1",
+        "time": "2025-07-29 14:02:01",
         "status": 202
     },
     {
         "eventType": "Success",
         "id": "0",
-        "time": "2025-07-16 14:03:10",
-        "duration": 129 
+        "time": "2025-07-29 14:03:10",
+        "duration": 70
+    },
+    {
+        "eventType": "Failure",
+        "id": "1",
+        "time": "2025-07-29 14:04:45",
+        "msg": "overlapping test red!"
     },
     {
        	"eventType": "Request",
-      	"id": "1",
-      	"time": "2025-07-16 14:05:49",
+      	"id": "2",
+      	"time": "2025-07-29 14:05:49",
 	    "request": "bad request example"	
     },
     {
     	"eventType": "Response",
-        "id": "1",
-        "time": "2025-07-16 14:05:50",
+        "id": "2",
+        "time": "2025-07-29 14:05:50",
         "status": 404
     },
     { 
         "eventType": "Request",
-        "id": "2",
-        "time": "2025-07-16 14:12:50",
+        "id": "3",
+        "time": "2025-07-29 14:11:31",
         "request": "example3"
     
     }, 
     {
     	"eventType": "Response",
-        "id": "2",
-        "time": "2025-07-16 14:12:51",
+        "id": "3",
+        "time": "2025-07-29 14:11:32",
         "status": 202
     
     },
     {	
         "eventType": "Request",
-        "id": "3",
-        "time": "2025-07-16 14:20:30",
+        "id": "4",
+        "time": "2025-07-29 14:11:33",
         "request": "example4"
     
     }, 
     {
     	"eventType": "Response",
-        "id": "3",
-        "time": "2025-07-16 14:20:31",
+        "id": "4",
+        "time": "2025-07-29 14:11:34",
         "status": 202
     
     },
     {
     	"eventType": "Success",
-        "id": "2",
-        "time": "2025-07-16 14:27:20",
-        "duration": 270
+        "id": "4",
+        "time": "2025-07-29 14:11:45",
+        "duration": 12
     },
     {
     	"eventType": "Success",
         "id": "3",
-        "time": "2025-07-16 14:14:30",
-        "duration": 60
+        "time": "2025-07-29 14:12:51",
+        "duration": 80
     },
     {
         "eventType": "Request",
-        "id": "4",
-        "time": "2025-07-16 14:32:04",
+        "id": "5",
+        "time": "2025-07-29 14:13:40",
         "request": "example5 fail case"
     
     }, 
     {
     	"eventType": "Response",
-        "id": "4",
-        "time": "2025-07-16 14:32:05",
+        "id": "5",
+        "time": "2025-07-29 14:13:41",
         "status": 202
         
     },
     {
         "eventType": "Failure",
-        "id": "4",
-        "time": "2025-07-16 14:37:34", 
+        "id": "5",
+        "time": "2025-07-29 14:13:43", 
         "msg": "something went wrong"
     },
     {
         "eventType": "Request",
-        "id": "5",
-        "time": "2025-07-16 17:29:04",
-        "request": "example6 incomplete case"
-    
+        "id": "6",
+        "time": "2025-07-29 14:14:04",
+        "request": "example6 concurrent 1 case"
+    },
+    {
+        "eventType": "Request",
+        "id": "7",
+        "time": "2025-07-29 14:14:04",
+        "request": "example7 concurrent 2 case"
+    },
+    {
+        "eventType": "Response",
+        "id": "7",
+        "time": "2025-07-29 14:14:05",
+        "status": 202
+    },
+    {
+        "eventType": "Response",
+        "id": "6",
+        "time": "2025-07-29 14:14:05",
+        "status": 202
+    },
+    {
+        "eventType": "Request",
+        "id": "8",
+        "time": "2025-07-29 14:15:03",
+        "request": "example8 concurrent 3 case"
+    },
+    {
+        "eventType": "Response",
+        "id": "8",
+        "time": "2025-07-29 14:15:04",
+        "status": 202
+    },
+    {
+        "eventType": "Request",
+        "id": "9",
+        "time": "2025-07-29 14:15:32",
+        "request": "example9 concurrent 4 case"
+    },
+    {
+        "eventType": "Response",
+        "id": "9",
+        "time": "2025-07-29 14:15:33",
+        "status": 202
+    },
+    {
+    	"eventType": "Success",
+        "id": "6",
+        "time": "2025-07-29 14:16:05",
+        "duration": 121
+    },
+    {
+    	"eventType": "Success",
+        "id": "7",
+        "time": "2025-07-29 14:16:10",
+        "duration": 126
+    },
+    {
+    	"eventType": "Success",
+        "id": "8",
+        "time": "2025-07-29 14:17:00",
+        "duration": 117
+    },
+    {
+    	"eventType": "Success",
+        "id": "9",
+        "time": "2025-07-29 14:17:20",
+        "duration": 108
+    },
+    {
+    	"eventType": "Request",
+        "id": "10",
+        "time": "2025-07-29 14:59:32",
+        "request": "example10 ongoing case"
     }
+
+
 ]
