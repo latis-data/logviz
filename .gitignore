@@ -3,6 +3,7 @@
 .metals
 project/project/
 target/
+.env
 
 # This file is an artifact from the frontend module that is copied
 # here for the purposes of running locally.
