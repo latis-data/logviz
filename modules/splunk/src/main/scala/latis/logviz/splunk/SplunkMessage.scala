@@ -7,13 +7,13 @@ import io.circe.parser
 
 opaque type SplunkMessage = Json
 
-object SplunkMessage:
-    def apply(s: Json): SplunkMessage = s
+object SplunkMessage {
+  def apply(s: Json): SplunkMessage = s
     
-    extension (m: SplunkMessage)
-      def hcursor = m.hcursor
-      
-end SplunkMessage 
+  extension (m: SplunkMessage) {
+    def hcursor = m.hcursor
+  }
+}
 
 given Decoder[SplunkMessage] = Decoder.instance { cursor =>
   for {

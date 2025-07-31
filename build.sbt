@@ -7,6 +7,7 @@ val fs2Version = "3.12.0"
 val http4sVersion = "0.23.30"
 val log4catsVersion = "2.7.1"
 val circeVersion = "0.14.13"
+val pureconfigVersion = "0.17.9"
 
 val commonSettings = Seq(
   scalacOptions -= "-Xfatal-warnings",
@@ -101,8 +102,9 @@ lazy val splunk = project
       "org.http4s" %%% "http4s-dsl" % http4sVersion,
       "org.http4s" %%% "http4s-ember-client" % http4sVersion,
       "ch.qos.logback" % "logback-classic" % "1.5.18",
-      "com.github.pureconfig" %%% "pureconfig-core" % "0.17.9",
-      "com.github.pureconfig" %%% "pureconfig-cats-effect" % "0.17.9"
+      "com.github.pureconfig" %%% "pureconfig-core" % pureconfigVersion,
+      "com.github.pureconfig" %%% "pureconfig-cats-effect" % pureconfigVersion,
+      "com.github.pureconfig" %%% "pureconfig-http4s" % pureconfigVersion
     )
   )
 
