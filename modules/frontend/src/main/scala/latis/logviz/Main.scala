@@ -8,8 +8,6 @@ import fs2.dom.HtmlElement
 import org.http4s.dom.FetchClientBuilder
 import org.http4s.client.Client
 
-import latis.logviz.model.Event
-
 
 /**
  * Renders HTML elements for log events using EventClient and EventComponent
