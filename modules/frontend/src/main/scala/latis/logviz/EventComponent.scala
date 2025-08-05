@@ -18,7 +18,6 @@ import fs2.dom.HtmlElement
 import fs2.Stream
 
 import latis.logviz.model.Event
-import latis.logviz.model.RequestEvent
 import latis.logviz.model.Rectangle
 
 
@@ -27,6 +26,7 @@ import latis.logviz.model.Rectangle
   * Draws canvas components with log event details
   * 
   * @param stream stream of log events from EventClient
+  * @param requestDetails div for hover feature
   */
 private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO]) {
   val timestampFormatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:00 VV")
@@ -46,8 +46,9 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
                     eParser.parse(event)).compile.drain)
       scrollRef <- Resource.eval(Ref[IO].of(0.0))
       isLive    <- Resource.eval(Ref[IO].of(true))
-      _         <- animate(canvas, context, sizer.asInstanceOf[HTMLElement], eParser, scrollRef, isLive)
-      // _         <- hover(canvas, requestDetails.asInstanceOf[HTMLElement])
+      rectRef   <- Resource.eval(Ref[IO].of(List[Rectangle]()))
+      _         <- animate(canvas, context, sizer.asInstanceOf[HTMLElement], eParser, scrollRef, isLive, rectRef)
+      _         <- hover(canvas, requestDetails.asInstanceOf[HTMLElement], rectRef)
     } yield(timeline)
   
   /**
@@ -75,8 +76,8 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
    * @param endTime the end of range of time that user may want to see
    * @param canvas
    * @param context 
-   * @param rectRef
-   * @param maxCounter number of columns to draw
+   * @param rects list of rectangles to draw
+   * @param cols number of columns to draw
    * @param top   current scroll position from the top
    * @param width total available space for columns to be drawn
   */
@@ -146,6 +147,14 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
    * 
    * Used dispatcher utility to use requestAnimationFrame as it takes in a js callback function. 
    * Dispatcher resource: [[https://typelevel.org/cats-effect/docs/std/dispatcher]]
+   * 
+   * @param canvas
+   * @param context
+   * @param sizer div for controlling how much space we have to scroll
+   * @param parser event parser holding list of events
+   * @param prevScrollPos ref holding the previous scroll position
+   * @param isLive ref determining whether to update live or not
+   * @param rectRef ref to hold list of rectangles to be drawn
   */
   private def animate(
     canvas: HTMLCanvasElement,
@@ -153,7 +162,8 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
     sizer: HTMLElement,
     parser: EventParser,
     prevScrollPos: Ref[IO, Double],
-    isLive: Ref[IO, Boolean]
+    isLive: Ref[IO, Boolean],
+    rectRef: Ref[IO, List[Rectangle]]
   ): Resource[IO, Dispatcher[IO]] =
     Dispatcher.sequential[IO] evalTap{ dispatcher => 
 
@@ -176,6 +186,7 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
                         // _       <-  makeRect(now, em.events, em.compEvents, em.rectangles, em.maxCounter, height, top, width)
                         events  <- parser.getEvents()
                         rects   <- Rectangles.makeRectangles(now, height, top, width/maxCol, events)
+                        _       <- rectRef.update(_ => rects)
                         _       <- drawCanvas(now, end, canvas, context, rects, maxCol, top, width)
                         _       <- prevScrollPos.update(_ => top)
                         _       <- if (top == 0.0) {
@@ -200,34 +211,34 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
   * Displays event information on hover over an event rectangle
   *
   * @param canvas
-  * @param rectRef
   * @param requestDetails HTML element to show event details of the event hovered over
+  * @param rectRef
   */
-  // def hover(canvas: HTMLCanvasElement, requestDetails: HTMLElement) =
-  //   Dispatcher.sequential[IO] evalTap { dispatcher =>
-  //     IO(canvas.onmousemove = { (event: MouseEvent) =>
-  //       // gets position of mouse click, subtract that by the canvas dimensions and we get the mouse positions relative to the canvas.
-  //       val rect = canvas.getBoundingClientRect()
-  //       val mouseX = event.clientX - rect.left
-  //       val mouseY = event.clientY - rect.top
+  def hover(canvas: HTMLCanvasElement, requestDetails: HTMLElement, rectRef: Ref[IO, List[Rectangle]]) =
+    Dispatcher.sequential[IO] evalTap { dispatcher =>
+      IO(canvas.onmousemove = { (event: MouseEvent) =>
+        // gets position of mouse click, subtract that by the canvas dimensions and we get the mouse positions relative to the canvas.
+        val rect = canvas.getBoundingClientRect()
+        val mouseX = event.clientX - rect.left
+        val mouseY = event.clientY - rect.top
 
-  //       def checkHover: IO[Unit] = {
-  //         for {
-  //           _ <-  em.rectangles.get.flatTap { rects =>
-  //                   rects.traverse {
-  //                     case Rectangle(event, x, y, width, height, color) => {
-  //                       if (mouseX >= x && mouseX <= x + width && mouseY <= y && mouseY >= y + height) {
-  //                         IO(requestDetails.textContent = s"EVENT DETAILS: $event")
-  //                       } else {
-  //                         IO.unit
-  //                       }
-  //                     }
-  //                   }
-  //                 }
-  //         } yield ()
-  //       }
-  //       dispatcher.unsafeRunAndForget(checkHover)
-  //     })
-  //   }
+        def checkHover: IO[Unit] = {
+          for {
+            _ <-  rectRef.get.flatTap { rects =>
+                    rects.traverse {
+                      case Rectangle(event, x, y, width, height, color) => {
+                        if (mouseX >= x && mouseX <= x + width && mouseY <= y && mouseY >= y + height) {
+                          IO(requestDetails.textContent = s"EVENT DETAILS: $event")
+                        } else {
+                          IO.unit
+                        }
+                      }
+                    }
+                  }
+          } yield ()
+        }
+        dispatcher.unsafeRunAndForget(checkHover)
+      })
+    }
 }
 
