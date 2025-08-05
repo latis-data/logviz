@@ -214,7 +214,11 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
   * @param requestDetails HTML element to show event details of the event hovered over
   * @param rectRef
   */
-  def hover(canvas: HTMLCanvasElement, requestDetails: HTMLElement, rectRef: Ref[IO, List[Rectangle]]) =
+  private def hover(
+    canvas: HTMLCanvasElement,
+    requestDetails: HTMLElement,
+    rectRef: Ref[IO, List[Rectangle]]
+    ): Resource[IO, Dispatcher[IO]]  =
     Dispatcher.sequential[IO] evalTap { dispatcher =>
       IO(canvas.onmousemove = { (event: MouseEvent) =>
         // gets position of mouse click, subtract that by the canvas dimensions and we get the mouse positions relative to the canvas.
