@@ -28,7 +28,7 @@ import latis.logviz.model.Rectangle
   * @param stream stream of log events from EventClient
   * @param requestDetails div for hover feature
   */
-private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO]) {
+class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO]) {
   val timestampFormatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:00 VV")
   val pixelsPerSec = 1.0
 
@@ -185,7 +185,7 @@ private[logviz] class EventComponent(stream: Stream[IO, Event], requestDetails: 
                         maxCol  <- parser.getMaxConcurrent()
                         // _       <-  makeRect(now, em.events, em.compEvents, em.rectangles, em.maxCounter, height, top, width)
                         events  <- parser.getEvents()
-                        rects   <- Rectangles.makeRectangles(now, height, top, width/maxCol, events)
+                        rects   = Rectangles.makeRectangles(now, height, top, width/maxCol, events)
                         _       <- rectRef.update(_ => rects)
                         _       <- drawCanvas(now, end, canvas, context, rects, maxCol, top, width)
                         _       <- prevScrollPos.update(_ => top)

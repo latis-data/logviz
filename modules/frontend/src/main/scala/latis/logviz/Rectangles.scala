@@ -4,8 +4,6 @@ import java.time.Duration
 import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
 
-import cats.effect.IO
-
 import latis.logviz.model.RequestEvent
 import latis.logviz.model.Rectangle
 
@@ -41,7 +39,7 @@ object Rectangles{
     top: Double,
     width: Int, 
     events: List[(RequestEvent, Int)]
-  ): IO[List[Rectangle]] = IO{
+  ): List[Rectangle] =
     val bottomY = top + height
     val rects: List[Rectangle] = events.foldLeft(List[Rectangle]()){ (acc, event) =>
         event match {
@@ -94,5 +92,4 @@ object Rectangles{
         }
     }
     rects
-  }
 }

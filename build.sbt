@@ -6,7 +6,6 @@ val catsEffectVersion = "3.6.1"
 val fs2Version = "3.12.0"
 val http4sVersion = "0.23.30"
 val log4catsVersion = "2.7.1"
-val munitVersion = "1.1.1"
 
 val commonSettings = Seq(
   scalacOptions -= "-Xfatal-warnings",
@@ -65,8 +64,6 @@ lazy val frontend = project
     scalaJSUseMainModuleInitializer := true,
     libraryDependencies ++= Seq(
       "com.armanbilge" %%% "calico" % "0.2.3",
-      "org.scalameta" %%% "munit" % munitVersion % Test,
-      "org.typelevel" %%% "munit-cats-effect" % "2.1.0" % Test,
       "org.typelevel" %%% "cats-core" % catsVersion,
       "org.typelevel" %%% "cats-effect" % catsEffectVersion,
       "co.fs2" %%% "fs2-core" % fs2Version,
