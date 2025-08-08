@@ -39,7 +39,8 @@ lazy val app = project
       "org.http4s" %% "http4s-ember-server" % http4sVersion,
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion,
       "ch.qos.logback" % "logback-classic" % "1.5.18" % Runtime
-    )
+    ),
+    run / fork := true
   )
 
 lazy val backend = project
@@ -51,6 +52,9 @@ lazy val backend = project
       "org.typelevel" %% "cats-core" % catsVersion,
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
       "co.fs2" %% "fs2-core" % fs2Version,
+      "org.gnieh" %% "fs2-data-json" % "1.12.0",
+      "org.gnieh" %% "fs2-data-json-circe" % "1.12.0",
+      "org.gnieh" %% "fs2-data-text" % "1.12.0",
       "org.http4s" %% "http4s-core" % http4sVersion,
       "org.http4s" %% "http4s-dsl" % http4sVersion,
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion
@@ -82,7 +86,9 @@ lazy val shared = crossProject(JSPlatform, JVMPlatform)
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe" %%% "circe-core" % circeVersion
+      "io.circe" %%% "circe-core" % circeVersion,
+      "co.fs2" %%% "fs2-core" % fs2Version,
+      "org.http4s" %%% "http4s-circe" % http4sVersion
     )
   )
 
