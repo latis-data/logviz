@@ -1,6 +1,7 @@
 package latis.logviz
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.data.json.ast
@@ -11,8 +12,11 @@ import io.circe.Json
 import org.http4s.HttpRoutes
 import org.http4s.StaticFile
 import org.http4s.dsl.Http4sDsl
+import pureconfig.* 
+import pureconfig.module.catseffect.syntax.*
 
 import latis.logviz.model.Event
+import latis.logviz.splunk.*
 
 /** 
  * Defines Routes
@@ -40,27 +44,38 @@ object LogvizRoutes extends Http4sDsl[IO] {
       StaticFile.fromResource("styles.css", req.some).getOrElseF(NotFound())
 
     case req @ GET -> Root / "events" =>
-      // getting the contents of the file
-      val rawtext: Stream[IO, Byte] = readClassLoaderResource[IO]("events.json")
+      val configSplunkClient: Boolean = sys.env.getOrElse("CONFIGURE_SPLUNK_CLIENT", "false").toBoolean
 
-      // transforming to a stream of json
-      val rawjson: Stream[IO, Json] = rawtext.through(ast.parse)
+      if configSplunkClient then
+        // optionally, get events from splunkclient
+        val runSC: Resource[IO, SplunkClient] = for {
+          splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]()) // Resource[IO, SplunkConfig]
+          client     <- SplunkClient.make(splunkConf.uri, splunkConf.username, splunkConf.password) // Resource[IO, SplunkClient]
+        } yield client
 
-      val parsedJson: Stream[IO, Event] = rawjson.flatMap { fulljson =>
-        // separating the full json into json objects for each event
-        val decodedResult = fulljson.hcursor.as[List[Json]]
-      
-        // parse into Events
-        decodedResult match {
-          case Right(jsonList) => 
-            val events: List[Event] = jsonList.map(_.as[Event].toOption.get) // mapping to Event type
-            println(events)
-            Stream.emits(events).covary[IO]
-          case Left(error) =>
-            Stream.raiseError[IO](new Exception(s"Error parsing events.json into event stream with error: $error"))
+        runSC.use { sclient =>
+          val eventStream: Stream[IO, Event] = sclient.query()
+          Ok(eventStream)
         }
-      }
+      else 
+        // getting events from events.json
+        val rawtext: Stream[IO, Byte] = readClassLoaderResource[IO]("events.json")
 
-      Ok(parsedJson)
+        val rawjson: Stream[IO, Json] = rawtext.through(ast.parse)
+
+        val parsedJson: Stream[IO, Event] = rawjson.flatMap { fulljson =>
+          val decodedResult = fulljson.hcursor.as[List[Json]]
+        
+          decodedResult match {
+            case Right(jsonList) => 
+              val events: List[Event] = jsonList.map(_.as[Event].toOption.get) // mapping to Event type
+              println(events)
+              Stream.emits(events).covary[IO]
+            case Left(error) =>
+              Stream.raiseError[IO](new Exception(s"Error parsing events.json into event stream with error: $error"))
+          }
+        }
+
+        Ok(parsedJson)
   }
 }

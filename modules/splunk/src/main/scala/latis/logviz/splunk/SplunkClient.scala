@@ -3,7 +3,6 @@ package latis.logviz.splunk
 import scala.concurrent.duration.*
 
 import cats.effect.IO
-import cats.effect.IOApp
 import cats.effect.Resource
 import fs2.Stream
 import io.circe.Json
@@ -11,8 +10,6 @@ import org.http4s.*
 import org.http4s.circe.*
 import org.http4s.ember.client.EmberClientBuilder
 import org.typelevel.ci.CIString
-import pureconfig.* 
-import pureconfig.module.catseffect.syntax.*
 
 import latis.logviz.model.Event
 
@@ -116,11 +113,12 @@ object SplunkClient {
             client.expect[Json](request)
           }
 
-          private def makeStream(response: Json): Stream[IO, Event] = {
+          private def makeStream(response: Json): Stream[IO, Event] = { 
             // making a stream of messages
             val decodedResult = response.hcursor.downField("results").as[List[SplunkMessage]]
             val mStrm: Stream[IO, SplunkMessage] = decodedResult match {
               case Right(messages) => 
+                println("Done!")
                 Stream.emits(messages).covary[IO]
               case Left(error) =>
                 Stream.raiseError(new Exception(s"Error parsing Json into Stream with error: $error"))
@@ -182,20 +180,5 @@ object SplunkClient {
           }
         }
       }
-  }
-}
-
-object app extends IOApp.Simple {
-  override def run: IO[Unit] = {
-    val runApp = for {
-      splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]()) // Resource[IO, SplunkConfig]
-      client     <- SplunkClient.make(splunkConf.uri, splunkConf.username, splunkConf.password) // Resource[IO, SplunkClient]
-    } yield client
-
-    runApp.use { sclient =>
-      val eventStream: Stream[IO, Event] = sclient.query()
-      eventStream.compile.drain // making the stream effectful and discarding its output
-      >> IO.println("Finished!")
-    }
   }
 }

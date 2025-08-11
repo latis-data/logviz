@@ -40,12 +40,13 @@ lazy val app = project
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion,
       "ch.qos.logback" % "logback-classic" % "1.5.18" % Runtime
     ),
-    run / fork := true
+    run / fork := true // TODO: remove this
   )
 
 lazy val backend = project
   .in(file("modules/backend"))
   .dependsOn(shared.jvm)
+  .dependsOn(splunk)
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
@@ -57,7 +58,10 @@ lazy val backend = project
       "org.gnieh" %% "fs2-data-text" % "1.12.0",
       "org.http4s" %% "http4s-core" % http4sVersion,
       "org.http4s" %% "http4s-dsl" % http4sVersion,
-      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion
+      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion,
+      "com.github.pureconfig" %%% "pureconfig-core" % pureconfigVersion,
+      "com.github.pureconfig" %%% "pureconfig-cats-effect" % pureconfigVersion,
+      "com.github.pureconfig" %%% "pureconfig-http4s" % pureconfigVersion
     )
   )
 
