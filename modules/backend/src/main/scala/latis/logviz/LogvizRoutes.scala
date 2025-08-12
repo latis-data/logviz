@@ -69,7 +69,6 @@ object LogvizRoutes extends Http4sDsl[IO] {
           decodedResult match {
             case Right(jsonList) => 
               val events: List[Event] = jsonList.map(_.as[Event].toOption.get) // mapping to Event type
-              println(events)
               Stream.emits(events).covary[IO]
             case Left(error) =>
               Stream.raiseError[IO](new Exception(s"Error parsing events.json into event stream with error: $error"))
