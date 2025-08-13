@@ -55,7 +55,15 @@ object LogvizRoutes extends Http4sDsl[IO] {
 
         runSC.use { sclient =>
           val eventStream: Stream[IO, Event] = sclient.query()
-          Ok(eventStream)
+
+          // checking how much is coming through the stream
+
+          //
+          Ok(
+            "Testing..."
+          )
+
+          //Ok(eventStream)
         }
       else 
         // getting events from events.json
