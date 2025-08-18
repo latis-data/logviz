@@ -8,20 +8,24 @@
 #timeline
 {
     display: flex;
-    height: 70%;
+    height: 75%;
     overflow: auto;
+    border: 1px;
+    margin: 5px;
 }   
 
 #bottom-panel
 {
     display: flex;
-    flex: 1;
+    height: 15%;
 }
 
 #header
 {
     display: flex;
-    height: 5%;
+    height: 10%;
+    align-items: center;
+    justify-content: end;
 }
 
 #canvas
@@ -36,3 +40,28 @@
     height: 86400px;
 }
 
+input:invalid + span::after {
+  content: "✖";
+  padding-left: 5px;
+}
+
+input:valid + span::after {
+  content: "✓";
+  padding-left: 5px;
+}
+
+#start-time {
+  display:flex;
+  align-items: center;
+}
+
+#end-time{
+  display: flex;
+  align-items: center;
+}
+
+#time-range{
+  display: flex;
+  align-items: center;
+  padding: 5px;
+}

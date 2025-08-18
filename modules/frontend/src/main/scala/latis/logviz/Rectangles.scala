@@ -11,7 +11,7 @@ import latis.logviz.model.Rectangle
 object Rectangles{
   val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss VV")
   val pixelsPerSec = 1.0
-  val startOffset = 150
+  val startOffset = 200
 
 
   /**
