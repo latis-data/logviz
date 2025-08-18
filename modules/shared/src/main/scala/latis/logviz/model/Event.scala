@@ -87,7 +87,7 @@ object Event {
         for {
           i <- cursor.downField("id").as[String]
           t <- cursor.downField("time").as[String]
-          m <- cursor.downField("msg").as[String]
+          m <- cursor.downField("message").as[String]
         } yield Failure(i,t, m)
         
       case typ => DecodingFailure(s"Unknown event type: $typ", ev.history).asLeft
