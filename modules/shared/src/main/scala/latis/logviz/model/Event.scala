@@ -94,7 +94,7 @@ object Event {
     }
   }
 
-  given Encoder[Event] = Encoder.instance { (event: Event) => event match
+  given Encoder[Event] = Encoder.instance {
     case Start(time) => 
       Json.obj("eventType" -> "Start".asJson, "time" -> time.asJson)
 

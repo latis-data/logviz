@@ -40,7 +40,7 @@ object EventClient {
 
       new EventClient {
         override def getEvents: Stream[IO, Event] =
-          Stream.evals(http.expect[List[Event]](baseUri / "events.json"))
+          Stream.evals(http.expect[List[Event]](baseUri / "events"))
       }
     }
 }

@@ -8,7 +8,6 @@ import fs2.data.json.ast
 import fs2.data.json.circe.*
 import fs2.data.text.utf8.byteStreamCharLike
 import fs2.io.readClassLoaderResource
-import io.circe.Json
 import org.http4s.HttpRoutes
 import org.http4s.StaticFile
 import org.http4s.dsl.Http4sDsl
@@ -44,43 +43,40 @@ object LogvizRoutes extends Http4sDsl[IO] {
       StaticFile.fromResource("styles.css", req.some).getOrElseF(NotFound())
 
     case req @ GET -> Root / "events" =>
-      val configSplunkClient: Boolean = sys.env.getOrElse("CONFIGURE_SPLUNK_CLIENT", "false").toBoolean
+      val eventClient: Resource[IO, Option[SplunkClient]] = for {
+        splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]())
+        client     <- splunkConf match {
+          case SplunkConfig.Disabled => Resource.pure[IO, Option[SplunkClient]](None)
+          case SplunkConfig.Enabled(uri, username, password) => SplunkClient.make(uri, username, password).map(Some(_))
+        }
+      } yield client
 
-      if configSplunkClient then
-        // optionally, get events from splunkclient
-        val runSC: Resource[IO, SplunkClient] = for {
-          splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]()) // Resource[IO, SplunkConfig]
-          client     <- SplunkClient.make(splunkConf.uri, splunkConf.username, splunkConf.password) // Resource[IO, SplunkClient]
-        } yield client
-
-        runSC.use { sclient =>
+      eventClient.use { 
+        case Some(sclient: SplunkClient) => 
+          // optionally, get events from splunkclient
           val eventStream: Stream[IO, Event] = sclient.query()
 
-          // counting the amount of events that were matched
+          // counting the amount of events that were matched -- this will print parsing message twice
           val count: IO[Unit] = eventStream.compile.count.flatMap { count =>
             IO.println(s"Processed $count events...")
           }
 
           count *> Ok(eventStream)
-        }
-      else 
-        // getting events from events.json
-        val rawtext: Stream[IO, Byte] = readClassLoaderResource[IO]("events.json")
+        case None =>
+          // getting events from events.json
+          val byteStream: Stream[IO, Byte] = readClassLoaderResource[IO]("events.json")
 
-        val rawjson: Stream[IO, Json] = rawtext.through(ast.parse)
+          val decodedJson: Stream[IO, Event] = byteStream
+            .through(ast.parse)
+            .flatMap{j => 
+              j.as[List[Event]] match {
+                case Right(events) => Stream.emits(events)
+                case Left(error) => 
+                  Stream.raiseError[IO](new Exception(s"Decoding events.json failed with error: $error"))
+              }
+            }
 
-        val parsedJson: Stream[IO, Event] = rawjson.flatMap { fulljson =>
-          val decodedResult = fulljson.hcursor.as[List[Json]]
-        
-          decodedResult match {
-            case Right(jsonList) => 
-              val events: List[Event] = jsonList.map(_.as[Event].toOption.get) // mapping to Event type
-              Stream.emits(events).covary[IO]
-            case Left(error) =>
-              Stream.raiseError[IO](new Exception(s"Error parsing events.json into event stream with error: $error"))
-          }
-        }
-
-        Ok(parsedJson)
+          Ok(decodedJson)
+      }
   }
 }
