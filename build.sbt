@@ -39,7 +39,8 @@ lazy val app = project
       "org.http4s" %% "http4s-ember-server" % http4sVersion,
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion,
       "ch.qos.logback" % "logback-classic" % "1.5.18" % Runtime
-    )
+    ),
+    run / fork := true
   )
 
 lazy val backend = project
