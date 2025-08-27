@@ -76,6 +76,7 @@ lazy val frontend = project
       "com.armanbilge" %%% "calico" % "0.2.3",
       "org.typelevel" %%% "cats-core" % catsVersion,
       "org.typelevel" %%% "cats-effect" % catsEffectVersion,
+      "io.circe" %%% "circe-parser" % circeVersion,
       "co.fs2" %%% "fs2-core" % fs2Version,
       "com.armanbilge" %%% "fs2-dom" % "0.2.1",
       "org.http4s" %%% "http4s-circe" % http4sVersion,
@@ -138,5 +139,5 @@ prodCompile := {
   IO.copyFile(js / "main.js", dst / "main.js")
 }
 
-addCommandAlias("runDev", "; devCompile; app/reStart")
+addCommandAlias("runDev", "; devCompile; app/reStart") // use app/run
 addCommandAlias("runProd", "; prodCompile; app/reStart")
