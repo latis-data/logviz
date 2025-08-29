@@ -60,15 +60,10 @@ object LogvizRoutes extends Http4sDsl[IO] {
           // optionally, get events from splunkclient
           val eventStream: Stream[IO, Event] = sclient.query()
 
-          // counting the amount of events that were matched -- this will print parsing message twice
-          val count: IO[Unit] = eventStream.compile.count.flatMap { count =>
-            IO.println(s"Processed $count events...")
-          }
-
           // turning into sse
           val sse: EventStream[IO] = eventStream.map(eventToServerSent)
 
-          count *> Ok(sse).map(_.putHeaders(`Content-Type`(MediaType.`text/event-stream`)))
+          Ok(sse).map(_.putHeaders(`Content-Type`(MediaType.`text/event-stream`)))
 
         case None =>
           // getting events from events.json
@@ -95,19 +90,20 @@ object LogvizRoutes extends Http4sDsl[IO] {
 def eventToServerSent(event: Event): ServerSentEvent = {
   event match {
     case Event.Start(time) =>
-      val jsonString: String = s"""{"eventType": "Start","time": "$time"}"""
+      val jsonString: String = s"""{"eventType":"Start","time":"$time"}"""
       ServerSentEvent(Some(jsonString), Some("Start"))
     case Event.Request(id, time, request) => 
-      val jsonString: String = s"""{"eventType": "Request","id": "$id","time": "$time","request": "$request"}"""
+      val req: String = request.replace("\"", """\"""") // escaping quotes in the request string
+      val jsonString: String = s"""{"eventType":"Request","id":"$id","time":"$time","request":"$req"}"""
       ServerSentEvent(Some(jsonString), Some("Request"))
     case Event.Response(id, time, status) =>
-      val jsonString: String = s"""{"eventType": "Response","id": "$id","time": "$time","status": "$status"}"""
+      val jsonString: String = s"""{"eventType":"Response","id":"$id","time":"$time","status":"$status"}"""
       ServerSentEvent(Some(jsonString), Some("Response"))
     case Event.Success(id, time, duration) =>
-      val jsonString: String = s"""{"eventType": "Success","id": "$id","time": "$time","duration": "$duration"}"""
+      val jsonString: String = s"""{"eventType":"Success","id":"$id","time":"$time","duration":"$duration"}"""
       ServerSentEvent(Some(jsonString), Some("Success"))
     case Event.Failure(id, time, msg) =>
-      val jsonString: String = s"""{"eventType": "Failure","id": "$id","time": "$time","msg": "$msg"}"""
+      val jsonString: String = s"""{"eventType":"Failure","id":"$id","time":"$time","msg":"$msg"}"""
       ServerSentEvent(Some(jsonString), Some("Failure"))
   }
 }

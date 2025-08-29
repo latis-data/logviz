@@ -44,7 +44,7 @@ object EventClient {
           
           http.stream(request).flatMap{ res =>
             res.body
-              .through(ServerSentEvent.decoder[IO]) // Pipe[IO, Byte, SSE]
+              .through(ServerSentEvent.decoder[IO])
               .map{
                 case ServerSentEvent(None, None, None, None, None) => None
                 case sse => 
@@ -64,41 +64,4 @@ object EventClient {
           }
       }
     }
-}
-
-def serverSentToEvent(event: ServerSentEvent): Event = {
-  val line: Array[String] = event.data match {
-    case Some(data) => 
-      data.split("time: ")
-    case None => 
-      throw new Exception("Server sent event missing data field")
-  }
-
-  event.eventType match {
-    case Some("Start") =>
-      val time: String = line(1)
-      Event.Start(time)
-    case Some("Request") => 
-      val id: String = line(0).split("id: ")(1).dropRight(1)
-      val time: String = line(1).split("request: ")(0).dropRight(1)
-      val request: String = line(1).split("request: ")(1)
-      Event.Request(id, time, request)
-    case Some("Response") =>
-      val id: String = line(0).split("id: ")(1).dropRight(1)
-      val time: String = line(1).split("status: ")(0).dropRight(1)
-      val status: Int = line(1).split("status: ")(1).toInt
-      Event.Response(id, time, status)
-    case Some("Success") =>
-      val id: String = line(0).split("id: ")(1).dropRight(1)
-      val time: String = line(1).split("duration: ")(0).dropRight(1)
-      val duration: Long = line(1).split("duration: ")(1).toLong
-      Event.Success(id, time, duration)
-    case Some("Failure") =>
-      val id: String = line(0).split("id: ")(1).dropRight(1)
-      val time: String = line(1).split("msg: ")(0).dropRight(1)
-      val msg: String = line(1).split("msg: ")(1)
-      Event.Failure(id, time, msg)
-    case Some(_) => throw new Exception("Error parsing server sent event to event")
-    case None => throw new Exception("Error parsing server sent event to event")
-  }
 }
