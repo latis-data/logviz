@@ -146,12 +146,12 @@ object SplunkClient {
               else if line.contains("Ember-Server service bound to address:") then
                 val time = line.split(" INFO")(0).drop(1)
                 Some(Event.Start(time))
-              else if line.contains("Request failed") then
-                val spl = line.split(" ERROR")
-                val id = "unknown"
-                val time = spl(0).drop(1)
-                val msg = "unknown"
-                Some(Event.Failure(id, time, msg))
+              // else if line.contains("Request failed") then
+              //   val spl = line.split(" ERROR")
+              //   val id = "unknown"
+              //   val time = spl(0).drop(1)
+              //   val msg = "unknown"
+              //   Some(Event.Failure(id, time, msg))
               else
                 None
             }
@@ -163,7 +163,7 @@ object SplunkClient {
 
           def query(/* takes args in the future */): Stream[IO, Event] = {
             // make the query from args
-            val query = "search index=latis source=latis3-swp* earliest_time=-24h@h latest_time=now"
+            val query = "search index=latis source=latis3-swp* earliest_time=-24h@h latest_time=now | reverse"
 
             Stream.eval {
               for {
