@@ -1,13 +1,8 @@
 package latis.logviz
 
 import cats.effect.IO
-import cats.effect.Resource
 import cats.syntax.all.*
-import fs2.Stream
-import fs2.data.json.ast
-import fs2.data.json.circe.*
-import fs2.data.text.utf8.byteStreamCharLike
-import fs2.io.readClassLoaderResource
+import java.time.LocalDateTime
 import org.http4s.EventStream // Stream[IO, ServerSentEvent]
 import org.http4s.HttpRoutes
 import org.http4s.ServerSentEvent
@@ -15,11 +10,8 @@ import org.http4s.StaticFile
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.http4s.MediaType
-import pureconfig.* 
-import pureconfig.module.catseffect.syntax.*
 
 import latis.logviz.model.Event
-import latis.logviz.splunk.*
 
 /** 
  * Defines Routes
@@ -47,43 +39,17 @@ object LogvizRoutes extends Http4sDsl[IO] {
       StaticFile.fromResource("styles.css", req.some).getOrElseF(NotFound())
 
     case req @ GET -> Root / "events" =>
-      val eventClient: Resource[IO, Option[SplunkClient]] = for {
-        splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]())
-        client     <- splunkConf match {
-          case SplunkConfig.Disabled => Resource.pure[IO, Option[SplunkClient]](None)
-          case SplunkConfig.Enabled(uri, username, password) => SplunkClient.make(uri, username, password).map(Some(_))
-        }
-      } yield client
 
-      eventClient.use { 
-        case Some(sclient: SplunkClient) => 
-          // optionally, get events from splunkclient
-          val eventStream: Stream[IO, Event] = sclient.query()
+      val start: LocalDateTime = LocalDateTime.parse("2025-08-29T11:00:00.000") // hard coding for now
+      val end: LocalDateTime = LocalDateTime.now()
 
-          // turning into sse
-          val sse: EventStream[IO] = eventStream.map(eventToServerSent)
+      // for now, always doing events.json, splunk is optional
+      val jsonEvents = JSONEventSource().getEvents(start, end)
+      val splunkEvents = SplunkEventSource().getEvents(start, end)
 
-          Ok(sse).map(_.putHeaders(`Content-Type`(MediaType.`text/event-stream`)))
+      val sse: EventStream[IO] = (jsonEvents ++ splunkEvents).map(eventToServerSent)
 
-        case None =>
-          // getting events from events.json
-          val byteStream: Stream[IO, Byte] = readClassLoaderResource[IO]("events.json")
-
-          val decodedJson: Stream[IO, Event] = byteStream
-            .through(ast.parse)
-            .flatMap{j => 
-              j.as[List[Event]] match {
-                case Right(events) => Stream.emits(events)
-                case Left(error) => 
-                  Stream.raiseError[IO](new Exception(s"Decoding events.json failed with error: $error"))
-              }
-            }
-
-          // turning into sse
-          val sse: EventStream[IO] = decodedJson.map(eventToServerSent)
-
-          Ok(sse).map(_.putHeaders(`Content-Type`(MediaType.`text/event-stream`)))
-      }
+      Ok(sse).map(_.putHeaders(`Content-Type`(MediaType.`text/event-stream`)))
   }
 }
 
