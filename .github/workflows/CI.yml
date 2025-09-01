@@ -1,0 +1,17 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: coursier/setup-action@v1
+        with:
+          jvm: adopt:8
+      - uses: coursier/cache-action@v6
+      - name: Update package lists
+        run: sudo apt-get update
+      - name: Run tests
+        run: sbt -v +test
