@@ -135,7 +135,7 @@ object SplunkClient {
                 val spl = line.split("HTTP/1.1 ")
                 val id = spl(0).split("request-id=")(1).dropRight(3)
                 val time = spl(0).split(" INFO")(0).drop(1)
-                val status = spl(1).split(" OK")(0).toInt
+                val status = spl(1).split(" ")(0).toInt
                 Some(Event.Response(id, time, status))
               else if line.contains("Elapsed ") then
                 val spl = line.split("Elapsed ")

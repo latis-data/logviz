@@ -13,8 +13,7 @@ import fs2.Stream
 
 import latis.logviz.model.Event
 
-val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-
+val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
 
 class JSONEventSource extends EventSource {
   override def getEvents(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] =
@@ -56,5 +55,5 @@ class JSONEventSource extends EventSource {
               "Invalid time") 
             case Right(value) => value.isAfter(start) && value.isBefore(end)
       }
-      decodedJson
+    decodedJson
 }
