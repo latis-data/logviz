@@ -39,8 +39,8 @@ object LogvizRoutes extends Http4sDsl[IO] {
       StaticFile.fromResource("styles.css", req.some).getOrElseF(NotFound())
 
     case req @ GET -> Root / "events" =>
-
-      val start: LocalDateTime = LocalDateTime.parse("2025-08-29T11:00:00.000") // hard coding for now
+      // hard coding times for now
+      val start: LocalDateTime = LocalDateTime.now().minusHours(24)
       val end: LocalDateTime = LocalDateTime.now()
 
       // for now, always doing events.json, splunk is optional

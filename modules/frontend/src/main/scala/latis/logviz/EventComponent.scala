@@ -133,6 +133,7 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
 
     // put borders around events
     if(color != "lightgray" && color != "white") then
+      context.lineWidth = 0.3
       context.strokeStyle = "black"
       context.strokeRect(x, y, width, duration)
   }
