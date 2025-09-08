@@ -48,11 +48,15 @@ object Main extends IOWebApp {
                       })
                     )
       timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
-      header      <- div(idAttr:= "header", liveButton)
-      bottom      <- div(idAttr:= "bottom-panel", div(idAttr:= "request-detail", requestH1, timeRange))
+      // header      <- div(idAttr:= "header", liveButton)
+      // bottom      <- div(idAttr:= "bottom-panel", div(idAttr:= "request-detail", requestH1))
+      requestInfo <- div(idAttr:= "request-detail", requestH1)
+      timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange)
+      testBox     <- div(idAttr:= "test-box")
       component   =  new EventComponent(ec.getEvents, requestH1, startRef, endRef, liveRef)
       timeline    <- component.render
-      html        <- div(idAttr:= "container", header, timeline, bottom)
+      box         <- div(idAttr:= "box", timeline, timeSelect, testBox, requestInfo)
+      html        <- div(idAttr:= "container", box)
       
   } yield html
 }

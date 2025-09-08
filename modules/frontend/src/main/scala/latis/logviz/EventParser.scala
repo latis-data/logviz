@@ -12,7 +12,6 @@ trait EventParser {
   def parse(event: Event): IO[Unit]
   def getEvents(): IO[List[(RequestEvent, Int)]]
   def getMaxConcurrent(): IO[Int]
- 
 }
 
 object EventParser {
@@ -30,6 +29,7 @@ object EventParser {
       pq 						<- PQueue.bounded[IO, Int](100)
       _ 						<- (0 to 99).toList.traverse(pq.offer(_))
     } yield new EventParser {
+
 
       /**
       * Parsing though log events from stream and mapping/appending (in)complete events

@@ -21,7 +21,6 @@ class TimeRangeComponent(
   liveRef: SignallingRef[IO, Boolean]
 ) {
   val formatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-// catch only catching datetime parse exception
   def render: Resource[IO, HtmlElement[IO]] =
     for {
       start <- Resource.eval(startRef.get)
@@ -44,10 +43,6 @@ class TimeRangeComponent(
                             _.evalMap(_ => self.value.get).filter(_.nonEmpty).foreach {v =>
                               val inputElem = self.asInstanceOf[HTMLInputElement]
                               if (inputElem.checkValidity()) {
-                                // java.time.zone.ZoneRulesException: Unknown time-zone ID: America/Denver
-                                // IO.println(test)
-                                // >> IO.println(test2)
-
                                 Either.catchOnly[DateTimeParseException](LocalDateTime.parse(v)) match
                                   case Left(value) => throw new IllegalArgumentException(
                                     "Invalid time") 
@@ -108,23 +103,6 @@ class TimeRangeComponent(
                       },
                       span(cls := "validity")
                     )
-      // liveButton  <- button(
-      //                 `type` := "button",
-      //                 "LIVE",
-      //                 styleAttr <-- liveRef.map(bool => 
-      //                                 bool match
-      //                                   case true => "background-color: #db2a30"
-      //                                   case false => "background-color: #FFFFFF"
-      //                               ),
-      //                 onClick(_ => {
-      //                   for {
-      //                     _ <- liveRef.update(bool => !bool)
-      //                     _ <- endRef.set(ZonedDateTime.now(ZoneId.of("UTC")))
-      //                     // test <- liveRef.get
-      //                     // _    <- IO.println(test)
-      //                   } yield ()
-      //                 })
-      //               )
       test  <- div(idAttr:= "time-range", div(idAttr:= "time-selection", startInput, endInput))
 
     } yield(test)
