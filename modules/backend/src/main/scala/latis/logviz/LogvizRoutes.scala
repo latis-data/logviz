@@ -24,8 +24,8 @@ import latis.logviz.model.Event
  * 
  * Get each file from the resources folder, else return notFound
 */
-object LogvizRoutes extends Http4sDsl[IO] {
-  def routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
+class LogvizRoutes extends Http4sDsl[IO] {
+  def routes(eventsource: EventSource): HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ GET -> Root =>
       StaticFile.fromResource("index.html", req.some).getOrElseF(NotFound())
 
@@ -43,11 +43,8 @@ object LogvizRoutes extends Http4sDsl[IO] {
       val start: LocalDateTime = LocalDateTime.now().minusHours(24)
       val end: LocalDateTime = LocalDateTime.now()
 
-      // for now, always doing events.json, splunk is optional
-      val jsonEvents = JSONEventSource().getEvents(start, end)
-      val splunkEvents = SplunkEventSource().getEvents(start, end)
-
-      val sse: EventStream[IO] = (jsonEvents ++ splunkEvents).map(eventToServerSent)
+      val events = eventsource.getEvents(start, end)
+      val sse: EventStream[IO] = events.map(eventToServerSent)
 
       Ok(sse).map(_.putHeaders(`Content-Type`(MediaType.`text/event-stream`)))
   }
