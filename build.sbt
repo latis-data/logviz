@@ -52,16 +52,16 @@ lazy val backend = project
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % catsVersion,
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion,
       "co.fs2" %% "fs2-core" % fs2Version,
       "org.gnieh" %% "fs2-data-json" % "1.12.0",
       "org.gnieh" %% "fs2-data-json-circe" % "1.12.0",
       "org.gnieh" %% "fs2-data-text" % "1.12.0",
       "org.http4s" %% "http4s-core" % http4sVersion,
       "org.http4s" %% "http4s-dsl" % http4sVersion,
-      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion,
-      "com.github.pureconfig" %%% "pureconfig-core" % pureconfigVersion,
-      "com.github.pureconfig" %%% "pureconfig-cats-effect" % pureconfigVersion,
-      "com.github.pureconfig" %%% "pureconfig-http4s" % pureconfigVersion
+      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion
     )
   )
 
@@ -139,5 +139,5 @@ prodCompile := {
   IO.copyFile(js / "main.js", dst / "main.js")
 }
 
-addCommandAlias("runDev", "; devCompile; app/reStart") // use app/run
+addCommandAlias("runDev", "; devCompile; app/reStart")
 addCommandAlias("runProd", "; prodCompile; app/reStart")

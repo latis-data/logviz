@@ -46,21 +46,17 @@ object EventClient {
             res.body
               .through(ServerSentEvent.decoder[IO])
               .map{
-                case ServerSentEvent(None, None, None, None, None) => None
-                case sse => 
-                  sse.data match {
-                  case Some(event) => 
-                    parse(event) match {
+                case ServerSentEvent(Some(data), _, _, _, _) =>
+                  parse(data) match {
                     case Right(json) => json.as[Event] match {
                       case Right(event) => Some(event)
                       case Left(error) => throw new Exception(s"Error parsing json to event with error $error")
                     }
                     case Left(error) => throw new Exception(s"Error parsing server sent event to json with error $error")
                   }
-                  case None => throw new Exception(s"Server sent event missing data field")
-                }
+                case _ => None
               }
-              .collect{case Some(event) => event} // getting rid of the None SSE
+              .unNone
           }
       }
     }

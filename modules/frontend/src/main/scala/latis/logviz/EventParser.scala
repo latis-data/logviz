@@ -146,7 +146,15 @@ object EventParser {
           compEvents  <- compEventsRef.get
         } yield(compEvents ++ events)
 
-      override def getMaxConcurrent(): IO[Int] = maxCounter.get
+      override def getMaxConcurrent(): IO[Int] = {
+        maxCounter.get.flatMap { count =>
+          if (count == 0) {
+            IO.pure(1)
+          } else {
+            IO.pure(count)
+          }
+        }
+      }
     }
   }
 }
