@@ -2,14 +2,13 @@ package latis.logviz
 
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.syntax.*
 import java.time.LocalDateTime
-import org.http4s.EventStream // Stream[IO, ServerSentEvent]
+import org.http4s.EventStream
 import org.http4s.HttpRoutes
 import org.http4s.ServerSentEvent
 import org.http4s.StaticFile
 import org.http4s.dsl.Http4sDsl
-import org.http4s.headers.`Content-Type`
-import org.http4s.MediaType
 
 import latis.logviz.model.Event
 
@@ -24,8 +23,8 @@ import latis.logviz.model.Event
  * 
  * Get each file from the resources folder, else return notFound
 */
-class LogvizRoutes extends Http4sDsl[IO] {
-  def routes(eventsource: EventSource): HttpRoutes[IO] = HttpRoutes.of[IO] {
+class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
+  def routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ GET -> Root =>
       StaticFile.fromResource("index.html", req.some).getOrElseF(NotFound())
 
@@ -46,27 +45,11 @@ class LogvizRoutes extends Http4sDsl[IO] {
       val events = eventsource.getEvents(start, end)
       val sse: EventStream[IO] = events.map(eventToServerSent)
 
-      Ok(sse).map(_.putHeaders(`Content-Type`(MediaType.`text/event-stream`)))
+      Ok(sse)
   }
-}
 
-def eventToServerSent(event: Event): ServerSentEvent = {
-  event match {
-    case Event.Start(time) =>
-      val jsonString: String = s"""{"eventType":"Start","time":"$time"}"""
-      ServerSentEvent(Some(jsonString), Some("Start"))
-    case Event.Request(id, time, request) => 
-      val req: String = request.replace("\"", """\"""") // escaping quotes in the request string
-      val jsonString: String = s"""{"eventType":"Request","id":"$id","time":"$time","request":"$req"}"""
-      ServerSentEvent(Some(jsonString), Some("Request"))
-    case Event.Response(id, time, status) =>
-      val jsonString: String = s"""{"eventType":"Response","id":"$id","time":"$time","status":"$status"}"""
-      ServerSentEvent(Some(jsonString), Some("Response"))
-    case Event.Success(id, time, duration) =>
-      val jsonString: String = s"""{"eventType":"Success","id":"$id","time":"$time","duration":"$duration"}"""
-      ServerSentEvent(Some(jsonString), Some("Success"))
-    case Event.Failure(id, time, msg) =>
-      val jsonString: String = s"""{"eventType":"Failure","id":"$id","time":"$time","msg":"$msg"}"""
-      ServerSentEvent(Some(jsonString), Some("Failure"))
+  private def eventToServerSent(event: Event): ServerSentEvent = {
+    val json = event.asJson
+    ServerSentEvent(json.noSpaces.some, json.asObject.flatMap(_("eventType").map(_.noSpaces)))
   }
 }

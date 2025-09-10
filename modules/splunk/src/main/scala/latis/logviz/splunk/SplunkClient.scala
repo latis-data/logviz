@@ -1,5 +1,7 @@
 package latis.logviz.splunk
 
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import scala.concurrent.duration.*
 
 import cats.effect.IO
@@ -14,7 +16,7 @@ import org.typelevel.ci.CIString
 import latis.logviz.model.Event
 
 trait SplunkClient {
-  def query(/* takes args in the future */): Stream[IO, Event]
+  def query(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event]
 }
 
 object SplunkClient {
@@ -146,12 +148,6 @@ object SplunkClient {
               else if line.contains("Ember-Server service bound to address:") then
                 val time = line.split(" INFO")(0).drop(1)
                 Some(Event.Start(time))
-              // else if line.contains("Request failed") then
-              //   val spl = line.split(" ERROR")
-              //   val id = "unknown"
-              //   val time = spl(0).drop(1)
-              //   val msg = "unknown"
-              //   Some(Event.Failure(id, time, msg))
               else
                 None
             }
@@ -161,9 +157,11 @@ object SplunkClient {
             eStrm
           }
 
-          def query(/* takes args in the future */): Stream[IO, Event] = {
+          def query(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] = {
             // make the query from args
-            val query = "search index=latis source=latis3-swp* earliest_time=-24h@h latest_time=now | reverse"
+            val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
+            val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
+            val query = s"search index=latis source=latis3-swp* earliest_time=$eTime latest_time=$lTime | reverse"
 
             Stream.eval {
               for {
@@ -171,7 +169,6 @@ object SplunkClient {
                 sid        <- generateQuery(sessionkey, query) // Step 2: Generate a query
                 _          <- waitLoop(sessionkey, sid) // Step 3: Check the status of a query
                 total      <- getTotalResults(sessionkey, sid)
-                //_          <- IO.println(s"Parsing $total results...")
                 res        <- getResults(sessionkey, sid, total) // Step 4: Get the results from the query
               } yield res
             }.flatMap(makeStream) // Step 5: Make a stream of logs and get a stream of events

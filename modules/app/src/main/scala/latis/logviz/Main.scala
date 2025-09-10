@@ -33,7 +33,7 @@ object Main extends IOApp.Simple {
       EmberServerBuilder
         .default[IO]
         .withHost(ipv4"0.0.0.0")
-        .withHttpApp(LogvizRoutes().routes(es).orNotFound)
+        .withHttpApp(LogvizRoutes(es).routes.orNotFound)
         .withShutdownTimeout(5.seconds)
         .build
         .useForever

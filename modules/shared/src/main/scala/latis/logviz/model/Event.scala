@@ -108,7 +108,7 @@ object Event {
       Json.obj("eventType" -> "Success".asJson, "id" -> id.asJson, "time" -> time.asJson, "duration" -> duration.asJson)
 
     case Failure(id, time, msg) =>
-      Json.obj("eventType" -> "Failure".asJson, "id" -> id.asJson, "time" -> time.asJson, "message" -> msg.asJson)
+      Json.obj("eventType" -> "Failure".asJson, "id" -> id.asJson, "time" -> time.asJson, "msg" -> msg.asJson)
   }
 
   given EntityEncoder[IO, Stream[IO, Event]] = streamJsonArrayEncoderOf[IO, Event]
