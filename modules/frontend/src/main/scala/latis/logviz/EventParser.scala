@@ -25,7 +25,7 @@ object EventParser {
       //counter for number of concurrent events 
       colCounter 		<- Ref[IO].of(0)
       //max number of concurrent events at once
-      maxCounter 		<- Ref[IO].of(0)
+      maxCounter 		<- Ref[IO].of(1)
       //priority queue to keep track of which concurrency depth to tie a request event to
       pq 						<- PQueue.bounded[IO, Int](100)
       _ 						<- (0 to 99).toList.traverse(pq.offer(_))
@@ -147,13 +147,7 @@ object EventParser {
         } yield(compEvents ++ events)
 
       override def getMaxConcurrent(): IO[Int] = {
-        maxCounter.get.flatMap { count =>
-          if (count == 0) {
-            IO.pure(1)
-          } else {
-            IO.pure(count)
-          }
-        }
+        maxCounter.get
       }
     }
   }
