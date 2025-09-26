@@ -41,6 +41,7 @@ enum RequestEvent{
   case Request(start: String, url: String)
   case Success(start: String, url: String, end: String, duration: Long)
   case Failure(start: String, url: String, end: String, msg: String)
+  case Partial(end: String, msg: String)
 }
 
 final case class Rectangle(event: (RequestEvent, Int), x: Double, y: Double, width: Double, height: Double, color: String)
