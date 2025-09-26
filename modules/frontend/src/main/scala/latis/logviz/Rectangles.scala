@@ -38,7 +38,8 @@ object Rectangles{
     height: Double,
     top: Double,
     width: Int, 
-    events: List[(RequestEvent, Int)]
+    events: List[(RequestEvent, Int)],
+    startTime: LocalDateTime
   ): List[Rectangle] =
     val bottomY = top + height
     val rects: List[Rectangle] = events.foldLeft(List[Rectangle]()){ (acc, event) =>
@@ -86,6 +87,18 @@ object Rectangles{
             if (y >= top && y_end < bottomY) {
               Rectangle((RequestEvent.Failure(start, url, end, msg), cDepth),
               startOffset + cDepth * width, y-top, width, y_end-y, "red") :: acc
+            } else {
+              acc
+            }
+          
+          case (RequestEvent.Partial(time, msg), cDepth) =>
+            val endTime = LocalDateTime.parse(time, formatter)
+            val y = Duration.between(startTime, currTime).toSeconds() * pixelsPerSec
+            val y_end = Duration.between(endTime, currTime).toSeconds() * pixelsPerSec
+
+            if (y >= top && y_end < bottomY) {
+              Rectangle((RequestEvent.Partial(time, msg), cDepth),
+              startOffset + cDepth * width, y-top, width, y_end-y, "green") :: acc
             } else {
               acc
             }

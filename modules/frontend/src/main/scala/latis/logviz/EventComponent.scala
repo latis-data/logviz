@@ -15,6 +15,7 @@ import cats.effect.Resource
 import cats.syntax.all.*
 import cats.effect.std.Dispatcher
 import cats.effect.kernel.Ref
+import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
 import fs2.Stream
 
@@ -29,7 +30,13 @@ import latis.logviz.model.Rectangle
   * @param stream stream of log events from EventClient
   * @param requestDetails div for hover feature
   */
-class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO]) {
+class EventComponent(
+  stream: Stream[IO, Event],
+  requestDetails: HtmlElement[IO],
+  startTime: SignallingRef[IO, LocalDateTime],
+  endTime: SignallingRef[IO, LocalDateTime],
+  liveRef: SignallingRef[IO, Boolean]
+  ) {
   val timestampFormatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:00")
   val pixelsPerSec = 1.0
 
@@ -37,19 +44,28 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
   def render: Resource[IO, HtmlElement[IO]] = 
     
     for {
-      canvasIO  <- canvasTag(idAttr:= "canvas")
-      sizer     <- div(idAttr:= "sizer")
-      timeline  <- div(idAttr:= "timeline", sizer, canvasIO)
-      canvas    =  canvasIO.asInstanceOf[HTMLCanvasElement]
-      context   =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
-      eParser   <- Resource.eval(EventParser())
-      _         <- Resource.eval(stream.evalTap(event =>
-                    eParser.parse(event)).compile.drain)
-      scrollRef <- Resource.eval(Ref[IO].of(0.0))
-      isLive    <- Resource.eval(Ref[IO].of(true))
-      rectRef   <- Resource.eval(Ref[IO].of(List[Rectangle]()))
-      _         <- animate(canvas, context, sizer.asInstanceOf[HTMLElement], eParser, scrollRef, isLive, rectRef)
-      _         <- hover(canvas, requestDetails.asInstanceOf[HTMLElement], rectRef)
+      canvasIO    <- canvasTag(idAttr:= "canvas")
+      sizer       <- div(idAttr:= "sizer")
+      timeline    <- div(idAttr:= "timeline", sizer, canvasIO)
+      canvas      =  canvasIO.asInstanceOf[HTMLCanvasElement]
+      context     =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
+      eParser     <- Resource.eval(EventParser())
+      _           <- Resource.eval(stream.evalTap(event =>
+                      eParser.parse(event)).compile.drain)
+      scrollRef   <- Resource.eval(Ref[IO].of(0.0))
+      isLive      <- Resource.eval(Ref[IO].of(true))
+      rectRef     <- Resource.eval(Ref[IO].of(List[Rectangle]()))
+      end         <- Resource.eval(endTime.get)
+      prevEndRef  <- Resource.eval(Ref[IO].of(end))
+      _           <- animate(canvas, 
+                      context, 
+                      sizer.asInstanceOf[HTMLElement],
+                      eParser,
+                      scrollRef, 
+                      isLive, 
+                      rectRef,
+                      prevEndRef)
+      _           <- hover(canvas, requestDetails.asInstanceOf[HTMLElement], rectRef)
     } yield(timeline)
   
   /**
@@ -95,7 +111,8 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
 
     val topTS = current.minusSeconds((top / pixelsPerSec).toLong)
     val currTruncated = topTS.truncatedTo(ChronoUnit.MINUTES)
-    val mins = ((math.min(convertTime(endTime, topTS), canvas.height.toDouble) /pixelsPerSec / 60)).toInt
+    val mins = ((math.min(convertTime(endTime, topTS), canvas.height.toDouble) 
+                /pixelsPerSec / 60)).toInt
     val colors = List("lightgray", "white")
 
     for {
@@ -170,7 +187,8 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
     parser: EventParser,
     prevScrollPos: Ref[IO, Double],
     isLive: Ref[IO, Boolean],
-    rectRef: Ref[IO, List[Rectangle]]
+    rectRef: Ref[IO, List[Rectangle]],
+    prevEndRef: Ref[IO, LocalDateTime]
   ): Resource[IO, Dispatcher[IO]] =
     Dispatcher.sequential[IO] evalTap{ dispatcher => 
 
@@ -179,22 +197,47 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
           top     <- IO(canvas.parentElement.scrollTop)
           live    <- isLive.get
           prevTop <- prevScrollPos.get
-          _       <- if (live || prevTop != top) {
+          start   <- startTime.get
+          prevEnd <- prevEndRef.get
+          end     <- endTime.get
+          liveTog <- liveRef.get
+          //if live button toggled on and
+          // if live(at the top of canvas) -> redraw
+          // or if scrolling happened(prevTop != top) -> redraw
+
+          //reason why live button is important here is 
+          //because we don't want resume live at top of canvas functionality when we set end date range in the past
+          //so live button tells us to allow live updating when at the top hence need for both liveTog and live
+
+          //POSSIBLE CHANGE: LIVETOG TURNS OFF WHENEVER WE MOVE OFF THE TOP. BUT RESUME TO LIVE FUNCTIONALITY GOES AWAY BECAUSE 
+          // WE DONT WANT TO RESUME TO LIVE IF WE HAVE DIFFERENT DATETIME FOR END TIME PICKED
+          _       <- if (liveTog && (live || prevTop != top)) {
+          //problem: what is liveTog gets toggled on but live is false and we didnt scroll?
                       for {
                         tlRect  <- IO(canvas.parentElement.getBoundingClientRect())
                         height  =  tlRect.height
                         _       <- IO(canvas.width = tlRect.width.toInt)
                         _       <- IO(canvas.height = tlRect.height.toInt)
                         width   <- IO(canvas.width - 150)     // offset by 150 for total width of canvas that rectangles should cover
-                        now     <- IO(LocalDateTime.now(ZoneOffset.UTC))
-                        end     <- IO(now.toLocalDate.atStartOfDay())
-                        _       <- IO(sizer.style.height = s"${convertTime(end, now)+2}px")
+                        endTime <- IO(LocalDateTime.now(ZoneOffset.UTC))
+                        _       <- IO(sizer.style.height = s"${convertTime(start, endTime)+2}px")
                         maxCol  <- parser.getMaxConcurrent()
-                        // _       <-  makeRect(now, em.events, em.compEvents, em.rectangles, em.maxCounter, height, top, width)
                         events  <- parser.getEvents()
-                        rects   = Rectangles.makeRectangles(now, height, top, width/maxCol, events)
+                        rects   = Rectangles.makeRectangles(endTime,
+                                   height,
+                                   top,
+                                   width/maxCol,
+                                   events,
+                                   start)
                         _       <- rectRef.update(_ => rects)
-                        _       <- drawCanvas(now, end, canvas, context, rects, maxCol, top, width)
+                        _       <- drawCanvas(endTime,
+                                    start,
+                                    canvas,
+                                    context,
+                                    rects,
+                                    maxCol,
+                                    top,
+                                    width)
                         _       <- prevScrollPos.update(_ => top)
                         _       <- if (top == 0.0) {
                                     isLive.update(_ => true)
@@ -202,6 +245,34 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
                                     isLive.update(_ => false)
                                   }
                       } yield ()
+                    } else if (!liveTog && (prevEnd != end || prevTop != top)){
+                        for {
+                          tlRect  <- IO(canvas.parentElement.getBoundingClientRect())
+                          height  =  tlRect.height
+                          _       <- IO(canvas.width = tlRect.width.toInt)
+                          _       <- IO(canvas.height = tlRect.height.toInt)
+                          width   <- IO(canvas.width - 150)
+                          _       <- IO(sizer.style.height = s"${convertTime(start, end)+2}px")
+                          maxCol  <- parser.getMaxConcurrent()
+                          events  <- parser.getEvents()
+                          rects   = Rectangles.makeRectangles(end,
+                                    height,
+                                    top,
+                                    width/maxCol,
+                                    events,
+                                    start)
+                          _       <- rectRef.update(_ => rects)
+                          _       <- drawCanvas(end,
+                                      start,
+                                      canvas,
+                                      context,
+                                      rects,
+                                      maxCol,
+                                      top,
+                                      width)
+                          _       <- prevScrollPos.update(_ => top)
+                          _       <- prevEndRef.set(end)
+                        } yield()
                     } else {
                       IO.unit
                     }
@@ -238,7 +309,8 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
             _ <-  rectRef.get.flatTap { rects =>
                     rects.traverse {
                       case Rectangle(event, x, y, width, height, color) => {
-                        if (mouseX >= x && mouseX <= x + width && mouseY <= y && mouseY >= y + height) {
+                        if (mouseX >= x && mouseX <= x + width 
+                            && mouseY <= y && mouseY >= y + height) {
                           IO{
                             requestDetails.style.fontSize = "20px"
                             requestDetails.textContent = s"EVENT DETAILS: $event"
