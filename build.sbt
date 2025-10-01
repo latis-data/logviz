@@ -6,7 +6,7 @@ val catsEffectVersion = "3.6.1"
 val fs2Version = "3.12.0"
 val http4sVersion = "0.23.30"
 val log4catsVersion = "2.7.1"
-val circeVersion = "0.14.13"
+val circeVersion = "0.14.15"
 val pureconfigVersion = "0.17.9"
 
 val commonSettings = Seq(
