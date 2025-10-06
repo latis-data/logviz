@@ -25,7 +25,7 @@ object EventParser {
       //counter for number of concurrent events 
       colCounter 		<- Ref[IO].of(0)
       //max number of concurrent events at once
-      maxCounter 		<- Ref[IO].of(0)
+      maxCounter 		<- Ref[IO].of(1)
       //priority queue to keep track of which concurrency depth to tie a request event to
       pq 						<- PQueue.bounded[IO, Int](100)
       _ 						<- (0 to 99).toList.traverse(pq.offer(_))
@@ -92,20 +92,28 @@ object EventParser {
           case Event.Success(id, time, duration) => 
             for {
               map     <- eventsRef.get
-              cDepth  <- map.get(id) match {
+              dResult <- map.get(id) match {
                           case Some((RequestEvent.Request(start, url), currDepth)) =>
                             compEventsRef.update(lst =>
                               (RequestEvent.Success(start, url, time, duration), 
                               currDepth) +: lst)
-                            >> IO(currDepth)
+                            >> IO(Some(currDepth))
                           case Some(_) => throw new IllegalArgumentException(
                             "Got an event that is not request, something is wrong") 
-                          case None => throw new IllegalArgumentException(
-                            "No request of this id found??")
+                          case None => 
+                            // request was not within the time range but the success was
+                            IO.pure(None)
                         }
-              _       <- eventsRef.update(m => m - id)
-              _       <- colCounter.update(c => c - 1)
-              _       <- pq.offer(cDepth)
+              _       <- dResult match {
+                          case Some(cDepth) =>
+                            for {
+                              _  <- eventsRef.update(m => m - id)
+                              _  <- colCounter.update(c => c - 1)
+                              _  <- pq.offer(cDepth)
+                            } yield ()
+                          case None =>
+                            IO.unit
+              }
             } yield ()
 
           case Event.Failure(id, time, msg) => 
@@ -138,7 +146,9 @@ object EventParser {
           compEvents  <- compEventsRef.get
         } yield(compEvents ++ events)
 
-      override def getMaxConcurrent(): IO[Int] = maxCounter.get
+      override def getMaxConcurrent(): IO[Int] = {
+        maxCounter.get
+      }
     }
   }
 }

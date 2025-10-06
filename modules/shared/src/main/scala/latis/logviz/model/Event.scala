@@ -1,8 +1,15 @@
 package latis.logviz.model
 
+import cats.effect.IO
 import cats.syntax.all.*
+import fs2.Stream
 import io.circe.Decoder
 import io.circe.DecodingFailure
+import io.circe.Encoder
+import io.circe.Json
+import io.circe.syntax.*
+import org.http4s.EntityEncoder
+import org.http4s.circe.*
 
 
 /**
@@ -86,4 +93,23 @@ object Event {
       case typ => DecodingFailure(s"Unknown event type: $typ", ev.history).asLeft
     }
   }
+
+  given Encoder[Event] = Encoder.instance {
+    case Start(time) => 
+      Json.obj("eventType" -> "Start".asJson, "time" -> time.asJson)
+
+    case Request(id, time, request) =>
+      Json.obj("eventType" -> "Request".asJson, "id" -> id.asJson, "time" -> time.asJson, "request" -> request.asJson)
+
+    case Response(id, time, status) =>
+      Json.obj("eventType" -> "Response".asJson, "id" -> id.asJson, "time" -> time.asJson, "status" -> status.asJson)
+
+    case Success(id, time, duration) =>
+      Json.obj("eventType" -> "Success".asJson, "id" -> id.asJson, "time" -> time.asJson, "duration" -> duration.asJson)
+
+    case Failure(id, time, msg) =>
+      Json.obj("eventType" -> "Failure".asJson, "id" -> id.asJson, "time" -> time.asJson, "msg" -> msg.asJson)
+  }
+
+  given EntityEncoder[IO, Stream[IO, Event]] = streamJsonArrayEncoderOf[IO, Event]
 }

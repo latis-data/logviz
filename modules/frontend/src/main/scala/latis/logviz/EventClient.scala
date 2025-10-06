@@ -4,9 +4,11 @@ import cats.effect.IO
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.dom.Window
-import org.http4s.EntityDecoder
+import io.circe.parser.*
+import org.http4s.Method
+import org.http4s.Request
+import org.http4s.ServerSentEvent
 import org.http4s.Uri
-import org.http4s.circe.jsonOf
 import org.http4s.client.Client
 
 import latis.logviz.model.Event
@@ -36,11 +38,26 @@ object EventClient {
     ).mapN { (protocol, host) =>
       val baseUri = Uri.unsafeFromString(s"$protocol//$host")
 
-      given eventDecoder: EntityDecoder[IO, List[Event]] = jsonOf
-
       new EventClient {
         override def getEvents: Stream[IO, Event] =
-          Stream.evals(http.expect[List[Event]](baseUri / "events.json"))
+          val request = Request[IO](method = Method.GET, uri = baseUri / "events")
+          
+          http.stream(request).flatMap{ res =>
+            res.body
+              .through(ServerSentEvent.decoder[IO])
+              .map{
+                case ServerSentEvent(Some(data), _, _, _, _) =>
+                  parse(data) match {
+                    case Right(json) => json.as[Event] match {
+                      case Right(event) => Some(event)
+                      case Left(error) => throw new Exception(s"Error parsing json to event with error $error")
+                    }
+                    case Left(error) => throw new Exception(s"Error parsing server sent event to json with error $error")
+                  }
+                case _ => None
+              }
+              .unNone
+          }
       }
     }
 }

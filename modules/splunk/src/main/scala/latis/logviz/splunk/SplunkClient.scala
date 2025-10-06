@@ -1,9 +1,10 @@
 package latis.logviz.splunk
 
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import scala.concurrent.duration.*
 
 import cats.effect.IO
-import cats.effect.IOApp
 import cats.effect.Resource
 import fs2.Stream
 import io.circe.Json
@@ -11,13 +12,11 @@ import org.http4s.*
 import org.http4s.circe.*
 import org.http4s.ember.client.EmberClientBuilder
 import org.typelevel.ci.CIString
-import pureconfig.* 
-import pureconfig.module.catseffect.syntax.*
 
 import latis.logviz.model.Event
 
 trait SplunkClient {
-  def query(/* takes args in the future */): Stream[IO, Event]
+  def query(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event]
 }
 
 object SplunkClient {
@@ -101,8 +100,6 @@ object SplunkClient {
           }
 
           private def getResults(sessionkey: String, sid: String, total: Int): IO[Json] = {
-            println(s"Parsing $total results...")
-
             val request = Request[IO](
               method = Method.GET,
               uri = (splunkuri / "services" / "search" / "jobs" / sid / "events") // use /results if we want transformed events (performing stats or operations on events)
@@ -116,7 +113,7 @@ object SplunkClient {
             client.expect[Json](request)
           }
 
-          private def makeStream(response: Json): Stream[IO, Event] = {
+          private def makeStream(response: Json): Stream[IO, Event] = { 
             // making a stream of messages
             val decodedResult = response.hcursor.downField("results").as[List[SplunkMessage]]
             val mStrm: Stream[IO, SplunkMessage] = decodedResult match {
@@ -140,7 +137,7 @@ object SplunkClient {
                 val spl = line.split("HTTP/1.1 ")
                 val id = spl(0).split("request-id=")(1).dropRight(3)
                 val time = spl(0).split(" INFO")(0).drop(1)
-                val status = spl(1).split(" OK")(0).toInt
+                val status = spl(1).split(" ")(0).toInt
                 Some(Event.Response(id, time, status))
               else if line.contains("Elapsed ") then
                 val spl = line.split("Elapsed ")
@@ -151,12 +148,6 @@ object SplunkClient {
               else if line.contains("Ember-Server service bound to address:") then
                 val time = line.split(" INFO")(0).drop(1)
                 Some(Event.Start(time))
-              else if line.contains("Request failed") then
-                val spl = line.split(" ERROR")
-                val id = "unknown"
-                val time = spl(0).drop(1)
-                val msg = "unknown"
-                Some(Event.Failure(id, time, msg))
               else
                 None
             }
@@ -166,9 +157,11 @@ object SplunkClient {
             eStrm
           }
 
-          def query(/* takes args in the future */): Stream[IO, Event] = {
+          def query(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] = {
             // make the query from args
-            val query = "search index=latis source=latis3-swp* earliest_time=-24h@h latest_time=now"
+            val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
+            val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
+            val query = s"search index=latis source=latis3-swp* earliest_time=$eTime latest_time=$lTime | reverse"
 
             Stream.eval {
               for {
@@ -182,20 +175,5 @@ object SplunkClient {
           }
         }
       }
-  }
-}
-
-object app extends IOApp.Simple {
-  override def run: IO[Unit] = {
-    val runApp = for {
-      splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]()) // Resource[IO, SplunkConfig]
-      client     <- SplunkClient.make(splunkConf.uri, splunkConf.username, splunkConf.password) // Resource[IO, SplunkClient]
-    } yield client
-
-    runApp.use { sclient =>
-      val eventStream: Stream[IO, Event] = sclient.query()
-      eventStream.compile.drain // making the stream effectful and discarding its output
-      >> IO.println("Finished!")
-    }
   }
 }

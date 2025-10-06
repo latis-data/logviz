@@ -2,14 +2,14 @@ package latis.logviz
 
 import java.time.Duration
 import java.time.format.DateTimeFormatter
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
 
 import latis.logviz.model.RequestEvent
 import latis.logviz.model.Rectangle
 
 
 object Rectangles{
-  val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss VV")
+  val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
   val pixelsPerSec = 1.0
   val startOffset = 150
 
@@ -34,7 +34,7 @@ object Rectangles{
     * @return list of rectangles
     */
   def makeRectangles(
-    currTime: ZonedDateTime,
+    currTime: LocalDateTime,
     height: Double,
     top: Double,
     width: Int, 
@@ -44,7 +44,7 @@ object Rectangles{
     val rects: List[Rectangle] = events.foldLeft(List[Rectangle]()){ (acc, event) =>
         event match {
           case (RequestEvent.Server(time), cDepth) => 
-            val eventTime = ZonedDateTime.parse(time, formatter)
+            val eventTime = LocalDateTime.parse(time, formatter)
             val y = Duration.between(eventTime, currTime).toSeconds() * pixelsPerSec
 
             if (y >= top && y - 2 < bottomY) {
@@ -55,7 +55,7 @@ object Rectangles{
             }
 
           case (RequestEvent.Request(start, url), cDepth) =>
-            val eventTime = ZonedDateTime.parse(start, formatter)
+            val eventTime = LocalDateTime.parse(start, formatter)
             val y = Duration.between(eventTime, currTime).toSeconds() * pixelsPerSec
             if (y >= top) {
               Rectangle((RequestEvent.Request(start, url), cDepth),
@@ -65,8 +65,8 @@ object Rectangles{
             }
 
           case (RequestEvent.Success(start, url, end, duration), cDepth) =>
-            val eventTime = ZonedDateTime.parse(start, formatter)
-            val endTime = ZonedDateTime.parse(end, formatter)
+            val eventTime = LocalDateTime.parse(start, formatter)
+            val endTime = LocalDateTime.parse(end, formatter)
             val y = Duration.between(eventTime, currTime).toSeconds() * pixelsPerSec
             val y_end = Duration.between(endTime, currTime).toSeconds() * pixelsPerSec
 
@@ -78,8 +78,8 @@ object Rectangles{
             }
           
           case (RequestEvent.Failure(start, url, end, msg), cDepth) =>
-            val eventTime = ZonedDateTime.parse(start, formatter)
-            val endTime = ZonedDateTime.parse(end, formatter)
+            val eventTime = LocalDateTime.parse(start, formatter)
+            val endTime = LocalDateTime.parse(end, formatter)
             val y = Duration.between(eventTime, currTime).toSeconds() * pixelsPerSec
             val y_end = Duration.between(endTime, currTime).toSeconds() * pixelsPerSec
 

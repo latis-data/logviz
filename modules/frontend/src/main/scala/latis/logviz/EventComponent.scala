@@ -1,6 +1,7 @@
 package latis.logviz
 
-import java.time.ZonedDateTime
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 
@@ -29,7 +30,7 @@ import latis.logviz.model.Rectangle
   * @param requestDetails div for hover feature
   */
 class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO]) {
-  val timestampFormatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:00 VV")
+  val timestampFormatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:00")
   val pixelsPerSec = 1.0
 
  
@@ -59,7 +60,7 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
    * Same as saying how far off we are from the top of canvas(current time)
    * [[https://www.geeksforgeeks.org/java/java-time-duration-class-in-java/#]]
   */
-  private def convertTime(timestamp: ZonedDateTime, current: ZonedDateTime): Double = 
+  private def convertTime(timestamp: LocalDateTime, current: LocalDateTime): Double = 
     java.time.Duration.between(timestamp, current).toSeconds() * pixelsPerSec
 
   /**
@@ -82,8 +83,8 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
    * @param width total available space for columns to be drawn
   */
   private def drawCanvas(
-    current: ZonedDateTime,
-    endTime: ZonedDateTime,
+    current: LocalDateTime,
+    endTime: LocalDateTime,
     canvas: HTMLCanvasElement,
     context: dom.CanvasRenderingContext2D,
     rects: List[Rectangle],
@@ -129,14 +130,20 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
   ): IO[Unit] = IO {
     context.fillStyle = color
     context.fillRect(x, y, width, duration)
+
+    // put borders around events
+    if(color != "lightgray" && color != "white") then
+      context.lineWidth = 0.3
+      context.strokeStyle = "black"
+      context.strokeRect(x, y, width, duration)
   }
   
   private def drawTS(
     context: dom.CanvasRenderingContext2D,
     y: Double,
-    timestamp: ZonedDateTime
+    timestamp: LocalDateTime
     ): IO[Unit] = IO {
-    context.font = ("helvectica")
+    context.font = ("helvetica")
     context.fillStyle = "black"
     context.fillText(timestamp.format(timestampFormatter), 0, y)}
 
@@ -179,8 +186,8 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
                         _       <- IO(canvas.width = tlRect.width.toInt)
                         _       <- IO(canvas.height = tlRect.height.toInt)
                         width   <- IO(canvas.width - 150)     // offset by 150 for total width of canvas that rectangles should cover
-                        now     <- IO(ZonedDateTime.now(java.time.ZoneId.of("UTC")))
-                        end     <- IO(now.toLocalDate.atStartOfDay(now.getZone()))
+                        now     <- IO(LocalDateTime.now(ZoneOffset.UTC))
+                        end     <- IO(now.toLocalDate.atStartOfDay())
                         _       <- IO(sizer.style.height = s"${convertTime(end, now)+2}px")
                         maxCol  <- parser.getMaxConcurrent()
                         // _       <-  makeRect(now, em.events, em.compEvents, em.rectangles, em.maxCounter, height, top, width)
@@ -232,7 +239,10 @@ class EventComponent(stream: Stream[IO, Event], requestDetails: HtmlElement[IO])
                     rects.traverse {
                       case Rectangle(event, x, y, width, height, color) => {
                         if (mouseX >= x && mouseX <= x + width && mouseY <= y && mouseY >= y + height) {
-                          IO(requestDetails.textContent = s"EVENT DETAILS: $event")
+                          IO{
+                            requestDetails.style.fontSize = "20px"
+                            requestDetails.textContent = s"EVENT DETAILS: $event"
+                          }
                         } else {
                           IO.unit
                         }
