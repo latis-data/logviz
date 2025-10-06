@@ -39,8 +39,8 @@ class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
 
     case req @ GET -> Root / "events" =>
       // hard coding times for now
-      // val start: LocalDateTime = LocalDateTime.now().minusHours(24)
-      val start: LocalDateTime = LocalDateTime.now().toLocalDate().atStartOfDay()
+      val start: LocalDateTime = LocalDateTime.now().minusHours(24)
+      // val start: LocalDateTime = LocalDateTime.now().toLocalDate().atStartOfDay()
       val end: LocalDateTime = LocalDateTime.now()
       // println(end)
 

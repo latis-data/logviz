@@ -8,7 +8,8 @@ import cats.syntax.all.*
 import latis.logviz.model.RequestEvent
 import latis.logviz.model.Event
 
-def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column] = Nil): IO[Option[Column]] = {
+
+private def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column] = Nil): IO[Option[Column]] = {
   //instead of keeping track of the number of concurrent columns and subtracting from the max for base case, I can just use tryTake!
   pq.tryTake.flatMap{
     case Some(col) =>  
@@ -102,7 +103,7 @@ object EventParser {
                             // case None => throw new IllegalArgumentException(
                             //   "No request of this id found??")
                             case None =>
-                              //adjust color later
+                              //color to be adjusted
                               //got an event whose request is outside the time range. Since status is 400, its complete
 
                               for {

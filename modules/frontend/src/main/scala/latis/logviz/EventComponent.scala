@@ -25,10 +25,13 @@ import latis.logviz.model.Rectangle
 
 
 /**
-  * Draws canvas components with log event details
+  * Creates canvas components and draws log events
   * 
   * @param stream stream of log events from EventClient
   * @param requestDetails div for hover feature
+  * @param startTime start time of date range
+  * @param endTime end time of date range
+  * @param liveRef whether live button is toggled
   */
 class EventComponent(
   stream: Stream[IO, Event],
@@ -41,6 +44,9 @@ class EventComponent(
   val pixelsPerSec = 1.0
 
  
+  /**
+    * returns scrollable canvas component
+    */
   def render: Resource[IO, HtmlElement[IO]] = 
     
     for {
@@ -108,11 +114,19 @@ class EventComponent(
     top: Double,
     width: Int
   ): IO[Unit] =
+    //TODO: used to interpreting endtime as the "start time" of the time range. change name to match newer changes
 
+    //computes what the top of the canvas(viewport) is
+    //takes the end date range and subtracts from the scroll position to 
+    //know what the timestamp is at the top of the viewport
     val topTS = current.minusSeconds((top / pixelsPerSec).toLong)
     val currTruncated = topTS.truncatedTo(ChronoUnit.MINUTES)
+    
+    //calculates the number of minutes/timestamps to be drawn
     val mins = ((math.min(convertTime(endTime, topTS), canvas.height.toDouble) 
                 /pixelsPerSec / 60)).toInt
+
+    //used for alternating column colors
     val colors = List("lightgray", "white")
 
     for {
@@ -179,6 +193,7 @@ class EventComponent(
    * @param prevScrollPos ref holding the previous scroll position
    * @param isLive ref determining whether to update live or not
    * @param rectRef ref to hold list of rectangles to be drawn
+   * @param prevEndRef ref to hold previous end time. used to determine if need to redraw
   */
   private def animate(
     canvas: HTMLCanvasElement,
@@ -201,26 +216,31 @@ class EventComponent(
           prevEnd <- prevEndRef.get
           end     <- endTime.get
           liveTog <- liveRef.get
-          //if live button toggled on and
-          // if live(at the top of canvas) -> redraw
-          // or if scrolling happened(prevTop != top) -> redraw
+
+          //*** liveTog will currently always be true 
 
           //reason why live button is important here is 
           //because we don't want resume live at top of canvas functionality when we set end date range in the past
           //so live button tells us to allow live updating when at the top hence need for both liveTog and live
 
-          //POSSIBLE CHANGE: LIVETOG TURNS OFF WHENEVER WE MOVE OFF THE TOP. BUT RESUME TO LIVE FUNCTIONALITY GOES AWAY BECAUSE 
-          // WE DONT WANT TO RESUME TO LIVE IF WE HAVE DIFFERENT DATETIME FOR END TIME PICKED
+          //if liveTog(want live updates when at the top) and if live(meaning we're at top of the canvas) then we always redraw each animation frame
           _       <- if (liveTog && (live || prevTop != top)) {
-          //problem: what is liveTog gets toggled on but live is false and we didnt scroll?
+
                       for {
+                        //if user changes size of browser or anything, then just adjusting canvas to fit those changes
                         tlRect  <- IO(canvas.parentElement.getBoundingClientRect())
                         height  =  tlRect.height
                         _       <- IO(canvas.width = tlRect.width.toInt)
                         _       <- IO(canvas.height = tlRect.height.toInt)
-                        width   <- IO(canvas.width - 150)     // offset by 150 for total width of canvas that rectangles should cover
+
+                        //width to be used for drawing area
+                        width   <- IO(canvas.width - 150) 
+
+                        //grabbing the current time to be used as endtime/top of canvas
                         endTime <- IO(LocalDateTime.now(ZoneOffset.UTC))
+                        //updating sizer height used for how much you can scroll
                         _       <- IO(sizer.style.height = s"${convertTime(start, endTime)+2}px")
+
                         maxCol  <- parser.getMaxConcurrent()
                         events  <- parser.getEvents()
                         rects   = Rectangles.makeRectangles(endTime,
@@ -245,6 +265,9 @@ class EventComponent(
                                     isLive.update(_ => false)
                                   }
                       } yield ()
+
+                      //*** unused until timecomponent is re-introduced
+                      //only redraw when scrolling or there are changes if live is not toggled
                     } else if (!liveTog && (prevEnd != end || prevTop != top)){
                         for {
                           tlRect  <- IO(canvas.parentElement.getBoundingClientRect())

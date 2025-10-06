@@ -28,14 +28,15 @@ object Main extends IOWebApp {
 
     for {
       ec          <- client
-      // header      <- div(idAttr:= "header")
       requestH1   <- h1(idAttr:= "request")
-      // bottom      <- div(idAttr:= "bottom-panel", div(idAttr:= "request-detail", requestH1))
       now         <- Resource.eval(IO(LocalDateTime.now(ZoneOffset.UTC)))
-      startRef    <- Resource.eval(SignallingRef[IO].of(now.toLocalDate().atStartOfDay()))
+      // startRef    <- Resource.eval(SignallingRef[IO].of(now.toLocalDate().atStartOfDay()))
+      startRef    <- Resource.eval(SignallingRef[IO].of(now.minusHours(24)))
+
+      //***
       endRef      <- Resource.eval(SignallingRef[IO].of(now))
       liveRef     <- Resource.eval(SignallingRef[IO].of(true))
-      liveButton  <- button(
+      liveButton  <- button( 
                       `type` := "button",
                       "LIVE",
                       styleAttr <-- liveRef.map(bool => 
@@ -50,13 +51,20 @@ object Main extends IOWebApp {
                         } yield ()
                       })
                     )
-      timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
+      //***
+
+      //TODO: use later once able to make event events everytime time range changes
+      //changes that are currently unused due to waiting on eventComponent rework will be marked with ***
+      timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render //***
+
+
       component   =  new EventComponent(ec.getEvents, requestH1, startRef, endRef, liveRef)
       timeline    <- component.render
-      timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange)
+
+      // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange) /***
       testBox     <- div(idAttr:= "test-box")
       requestInfo <- div(idAttr:= "request-detail", requestH1)
-      box         <- div(idAttr:= "box", timeline, timeSelect, testBox, requestInfo)
+      box         <- div(idAttr:= "box", timeline, testBox, requestInfo)
       html        <- div(idAttr:= "container", box)
       
   } yield html

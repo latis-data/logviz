@@ -31,6 +31,7 @@ object Rectangles{
     * @param top offset in pixels from the top of the "canvas" top of canvas is at that offset
     * @param width width of each rectangle
     * @param events 
+    * @param startTime to be used for partial events
     * @return list of rectangles
     */
   def makeRectangles(
