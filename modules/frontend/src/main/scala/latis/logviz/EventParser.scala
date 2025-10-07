@@ -71,7 +71,7 @@ object EventParser {
               c				<- colCounter.updateAndGet(c => c + 1)
               _ 			<- maxCounter.update(prev => math.max(prev, c))
               _ 			<- compEventsRef.update(lst => 
-                          (RequestEvent.Server(time), cDepth) +: lst
+                          (RequestEvent.Server(time), usedCol) +: lst
                         )
               _				<- colCounter.update(c => c - 1)
               _				<- pq.offer(usedCol)
@@ -84,7 +84,7 @@ object EventParser {
               c       <- colCounter.updateAndGet(c => c + 1)
               _       <- maxCounter.update(prev => math.max(prev, c))
               _       <- eventsRef.update(map =>
-                          map + (id -> (RequestEvent.Request(time, request), cDepth))
+                          map + (id -> (RequestEvent.Request(time, request), usedCol))
                         )
             } yield ()
 
