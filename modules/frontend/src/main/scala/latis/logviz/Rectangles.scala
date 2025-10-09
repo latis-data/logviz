@@ -11,6 +11,7 @@ import latis.logviz.model.Rectangle
 object Rectangles{
   val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
   val pixelsPerSec = 1.0
+  //startOffset is used for when to start drawing the columns. Since we have timestamps drawn on the same canvas, we can't just start at x=0. 
   val startOffset = 150
 
 
@@ -42,15 +43,23 @@ object Rectangles{
     events: List[(RequestEvent, Int)],
     startTime: LocalDateTime
   ): List[Rectangle] =
+    //top(how much we've scrolled from the top) + height(viewport) tells us what the bottom "timestamp"/y position currently is
     val bottomY = top + height
     val rects: List[Rectangle] = events.foldLeft(List[Rectangle]()){ (acc, event) =>
         event match {
           case (RequestEvent.Server(time), cDepth) => 
             val eventTime = LocalDateTime.parse(time, formatter)
+            //gets the y starting position of the event given its starting time 
+            //and the current time(time at top of canvas, which could be either live time or the end time set by date range)
             val y = Duration.between(eventTime, currTime).toSeconds() * pixelsPerSec
 
+            //start time of event is before the current time with scroll offset and thus its y value is greater the current scrolled top of viewport value
+            // and since server event has only a start time, we apply an additional width of 2 pixels to allow drawing and hovering over the event easier. 
+            // so if y-2(starting point) is less than the bottom of viewport, meaning that the time for this event is above the starting time/bottom of canvas 
             if (y >= top && y - 2 < bottomY) {
               Rectangle((RequestEvent.Server(time), cDepth),
+              //offset + the concurrency level + the width of each column tells us the x position of the event which is equal to the x position that the column that the event is in starts at. 
+              //y-top gives us the y value to draw the event at since the canvas is offset by the scroll top pixels. 
               startOffset + cDepth * width, y - top, width, -2, "green") :: acc
             } else {
               acc
@@ -59,6 +68,8 @@ object Rectangles{
           case (RequestEvent.Request(start, url), cDepth) =>
             val eventTime = LocalDateTime.parse(start, formatter)
             val y = Duration.between(eventTime, currTime).toSeconds() * pixelsPerSec
+            
+            //any remaining request events here are ongoing events so as long as they are below the top of the viewport, then we make the rectangle
             if (y >= top) {
               Rectangle((RequestEvent.Request(start, url), cDepth),
               startOffset + cDepth * width, y-top, width, -(y-top), "green") :: acc
@@ -72,6 +83,8 @@ object Rectangles{
             val y = Duration.between(eventTime, currTime).toSeconds() * pixelsPerSec
             val y_end = Duration.between(endTime, currTime).toSeconds() * pixelsPerSec
 
+            //not only needs to be below top of viewport but also 
+            //the end time needs to be above the bottom of the viewport
             if (y >= top && y_end < bottomY) {
               Rectangle((RequestEvent.Success(start, url, end, duration), cDepth),
               startOffset + cDepth * width, y-top, width, y_end-y, "green") :: acc
