@@ -8,7 +8,20 @@ import cats.syntax.all.*
 import latis.logviz.model.RequestEvent
 import latis.logviz.model.Event
 
-
+/**
+  * Gets an unused column from the pq
+  * 
+  * Partial events cannot be assigned an already used column or else
+  * they will overlap over the existing events in that column because they 
+  * extend all the way to the start of the canvas. 
+  * 
+  * Thus, given a partial event, it must be the first event drawn on the column it's assigned
+  *
+  * @param pq
+  * @param acc used to store the columns that were already used, pushed back into PQ once found an unused column
+  * @return returns an Option, which will either be an unused column or none. None meaning that there's 
+  * no more unused columns available in the PQ which indicates that we need to increase the size of the PQ(more total columns)
+  */
 private def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column] = Nil): IO[Option[Column]] = {
   //instead of keeping track of the number of concurrent columns and subtracting from the max for base case, I can just use tryTake!
   pq.tryTake.flatMap{
@@ -19,8 +32,8 @@ private def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column] = Nil): IO
           acc.traverse(pq.offer(_))
           >> IO(Some(col.copy(used = true)))
       }
-    //pq is empty: meaning no columns that are unused -> need to increase max number of columns
     case None =>
+      //pq is empty: meaning no columns that are unused -> need to increase max number of columns
       acc.traverse(pq.offer(_))
       >> IO(None)
     }
@@ -33,6 +46,10 @@ trait EventParser {
  
 }
 
+/**
+ * Parsing events as request events and storing them as incomplete and complete to be used to create rectangles
+ * Keeping track of the maximum number of concurrent events at a time to determine number of columns to draw
+*/
 object EventParser {
   def apply(): IO[EventParser] = {
     for {
@@ -45,24 +62,20 @@ object EventParser {
       //max number of concurrent events at once
       maxCounter 		<- Ref[IO].of(1)
       //priority queue to keep track of which concurrency depth to tie a request event to
+      //resource on pq: https://typelevel.org/cats-effect/docs/std/pqueue
       pq 						<- PQueue.bounded[IO, Column](100)
       _ 						<- (0 to 99).toList.traverse(i => pq.offer(Column(i, false)))
       // _ 						<- (0 to 99).toList.traverse(pq.offer(_))
     } yield new EventParser {
 
       /**
-      * Parsing though log events from stream and mapping/appending (in)complete events
-      * 
-      * For each event in stream
-      *  - Start: since start has no id and is waiting on no other events, will append to list of completed events
-      *  - Request: is an incompleted event, waiting on additional log event(s) of same id
-      *  - Response: If we get an error status code, we have a completed event: remove mapping and add to list of completed events. Else, do nothing as we have successful response code so we will wait for an outcome log event.
-      *  - Success: Successful request event. Remove from map and append to list of completed events
-      *  - Failure: Failed request event. Remove from map and append to list of completed events
-      */
-      // https://typelevel.org/cats-effect/docs/std/pqueue
+       * Parsing though log events given from stream and mapping/appending (in)complete events
+       * 
+       * Removing the mapping once the event is completed and keeping track of number of concurrent events at once. 
+       */
       override def parse(event: Event): IO[Unit] =
         event match {
+          //start events have no id and is waiting on no other events, so will just append to list of completed events
           case Event.Start(time) =>
             for {
               cDepth	<- pq.take
@@ -77,6 +90,7 @@ object EventParser {
               _				<- pq.offer(usedCol)
             } yield()
 
+          //map as incomplete event since need to wait on additional log events with corresponding id
           case Event.Request(id, time, request) => 
             for {
               cDepth  <- pq.take
@@ -88,23 +102,28 @@ object EventParser {
                         )
             } yield ()
 
+          //becomes completed event if status is an error-> no longer waiting on any additional log events
+          //else wait for log events with corresponding ids
           case Event.Response(id, time, status) => 
             if (status >= 400) {
               for {
                 map     <- eventsRef.get
                 cDepth  <- map.get(id) match {
+                            //Found the request with corresponding id!
                             case Some((RequestEvent.Request(start, url), currDepth)) =>
                               compEventsRef.update(lst => 
                                 (RequestEvent.Failure(start, url, time, status.toString),
                                 currDepth) +: lst)  
                               >> IO(currDepth)
+                            
+                            //Odd error that shouldn't happen, would need to investigate
                             case Some(_) => throw new IllegalArgumentException(
                               "Got an event that is not request, something is wrong") 
-                            // case None => throw new IllegalArgumentException(
-                            //   "No request of this id found??")
+                        
+                            //No request event found, meaning that it was sometime outside of time range. 
+                            //Thus, create a completed partial event since error status
                             case None =>
                               //color to be adjusted
-                              //got an event whose request is outside the time range. Since status is 400, its complete
 
                               for {
                                 currDepth <- getUnusedColumn(pq).flatMap{
@@ -119,21 +138,20 @@ object EventParser {
                                               currDepth) +: lst)
                               } yield(currDepth)
 
-
                           }
                 _       <- eventsRef.update(m => m - id)
                 _       <- colCounter.update(c => c - 1)
                 _       <- pq.offer(cDepth)
               } yield ()
             } else {
-              //could be an ongoing partial event if theres no matching id
-              //normally not storing responses, but we would want to in the partial event case since this is the "first instance" that we see for this event
-              // IO.unit
 
               for {
                 map <- eventsRef.get
                 _   <- map.get(id) match {
+                        //Found request event with corresponding id-> good no need to do anything and just wait for next log event with same id
                         case Some(_) => IO.unit
+
+                        //Request event for this id outside of time range in the past. Store as incomplete partial event since success status code. 
                         case None =>
                           for {
                             cDepth  <- getUnusedColumn(pq).flatMap{
@@ -152,6 +170,7 @@ object EventParser {
 
             }
 
+          //Successful end to a request-> store as completed event
           case Event.Success(id, time, duration) => 
             for {
               map     <- eventsRef.get
@@ -161,17 +180,19 @@ object EventParser {
                               (RequestEvent.Success(start, url, time, duration), 
                               currDepth) +: lst)
                             >> IO(currDepth)
+
                           case Some((RequestEvent.Partial(start, status), currDepth)) =>
                             compEventsRef.update(lst =>
                               (RequestEvent.Partial(time, s"successful event with response status of: $status, duration: $duration"), 
                               currDepth) +: lst)
                             >> IO(currDepth)
+
                           case Some(_) => throw new IllegalArgumentException(
                             "Got an event that is not request or partial, something is wrong") 
-                          // case None => throw new IllegalArgumentException(
-                          //   "No request of this id found??") 
+                          
+                          // request and success response somewhere in the past outside of date range
+                          // thus, add a completed partial event
                           case None => 
-                            // request and success response somewhere in the past outside of date range
                             for {
                               currDepth <- getUnusedColumn(pq).flatMap{
                                             case Some(value) => IO(value)
@@ -190,6 +211,7 @@ object EventParser {
               _       <- pq.offer(dResult)
             } yield ()
 
+          //same format as success
           case Event.Failure(id, time, msg) => 
             for {
               map     <- eventsRef.get
@@ -226,6 +248,11 @@ object EventParser {
             } yield ()
         }
     
+      /**
+        * Combining ongoing and completed events together in a list
+        *
+        * @return list of pairs of request events and their concurreny depth level!
+        */
       override def getEvents(): IO[List[(RequestEvent, Int)]] =
         for {
           incomp      <- eventsRef.get

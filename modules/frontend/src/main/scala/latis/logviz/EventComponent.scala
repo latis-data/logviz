@@ -234,6 +234,7 @@ class EventComponent(
                         _       <- IO(canvas.height = tlRect.height.toInt)
 
                         //width to be used for drawing area
+                        //subtracting by 150 to make room for timestamps to be drawn. So the total width available to event/column drawing is 150 pixels less
                         width   <- IO(canvas.width - 150) 
 
                         //grabbing the current time to be used as endtime/top of canvas

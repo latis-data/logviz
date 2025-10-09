@@ -16,7 +16,7 @@ import org.http4s.client.Client
 /**
  * Renders HTML elements for log events using EventClient and EventComponent
  * 
- * set up the layout for logviz page with header, canvas and bottom panel
+ * set up the layout for logviz page 
  * passing stream of events from eventclient to EventComponent to parse, store and draw onto canvas
  * */ 
 object Main extends IOWebApp {
@@ -36,6 +36,7 @@ object Main extends IOWebApp {
       //***
       endRef      <- Resource.eval(SignallingRef[IO].of(now))
       liveRef     <- Resource.eval(SignallingRef[IO].of(true))
+      //button to toggle whether to allow live updating or not.
       liveButton  <- button( 
                       `type` := "button",
                       "LIVE",
