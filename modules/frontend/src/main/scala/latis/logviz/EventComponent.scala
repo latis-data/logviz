@@ -21,6 +21,7 @@ import fs2.Stream
 
 import latis.logviz.model.Event
 import latis.logviz.model.Rectangle
+import cats.effect.std.Supervisor
 
 
 
@@ -50,14 +51,15 @@ class EventComponent(
   def render: Resource[IO, HtmlElement[IO]] = 
     
     for {
+      sup         <- Supervisor[IO](await=true)
       canvasIO    <- canvasTag(idAttr:= "canvas")
       sizer       <- div(idAttr:= "sizer")
       timeline    <- div(idAttr:= "timeline", sizer, canvasIO)
       canvas      =  canvasIO.asInstanceOf[HTMLCanvasElement]
       context     =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
       eParser     <- Resource.eval(EventParser())
-      _           <- Resource.eval(stream.evalTap(event =>
-                      eParser.parse(event)).compile.drain)
+      _           <- Resource.eval(sup.supervise(stream.evalTap(event =>
+                      eParser.parse(event)).compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
       isLive      <- Resource.eval(Ref[IO].of(true))
       rectRef     <- Resource.eval(Ref[IO].of(List[Rectangle]()))
