@@ -15,6 +15,9 @@ import latis.logviz.model.Event
 
 val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
 
+/**
+  * Test event source. Pulling dummy data from a test JSON file
+  */
 class JSONEventSource extends EventSource {
   override def getEvents(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] =
 
@@ -28,8 +31,23 @@ class JSONEventSource extends EventSource {
           case Left(error) => 
             Stream.raiseError[IO](new Exception(s"Decoding events.json failed. error: $error"))
         }
-      }.filter{
+       }.map{
+        //know for sure that this should be a parsable long since we already format it? or should I still catch exception?
+        case Event.Start(time) => 
+          Event.Start(offsetToLocalDateTime(time.toLong, start))
+        case Event.Request(id, time, request) => 
+          Event.Request(id, offsetToLocalDateTime(time.toLong, start), request)
+        case Event.Response(id, time, status) => 
+          Event.Response(id, offsetToLocalDateTime(time.toLong, start), status)
+        case Event.Success(id, time, duration) =>
+          Event.Success(id, offsetToLocalDateTime(time.toLong, start), duration)
+        case Event.Failure(id, time, msg) =>
+          Event.Failure(id, offsetToLocalDateTime(time.toLong, start), msg)
+       }
+      .filter{
+        //even if I have negative offset values, they wouldnt be apart of the stream because they get filtered out if we're basing the offsets off the start time
         case Event.Start(time) =>
+          //do I still need to catch datetimeparse exceptions if I know for sure this time string will be a valid localdatetime?
           Either.catchOnly[DateTimeParseException](LocalDateTime.parse(time, formatter)) match
             case Left(value) => throw new IllegalArgumentException(
               "Invalid time") 
@@ -57,3 +75,7 @@ class JSONEventSource extends EventSource {
       }
     decodedJson
 }
+
+private def offsetToLocalDateTime(offset: Long, requestTime: LocalDateTime): String =
+  val seconds = offset/1000
+  requestTime.plusSeconds(seconds).format(formatter)
