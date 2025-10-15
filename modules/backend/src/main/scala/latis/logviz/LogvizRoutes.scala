@@ -1,9 +1,11 @@
 package latis.logviz
 
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.syntax.*
-import java.time.LocalDateTime
 import org.http4s.EventStream
 import org.http4s.HttpRoutes
 import org.http4s.ServerSentEvent
@@ -39,9 +41,8 @@ class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
 
     case req @ GET -> Root / "events" =>
       // hard coding times for now
-      val start: LocalDateTime = LocalDateTime.now().minusHours(24)
-      val end: LocalDateTime = LocalDateTime.now()
-
+      val end: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
+      val start: LocalDateTime = end.minusHours(24)
       val events = eventsource.getEvents(start, end)
       val sse: EventStream[IO] = events.map(eventToServerSent)
 
