@@ -13,7 +13,6 @@ import calico.html.io.{*, given}
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
 
-// https://www.armanbilge.com/calico/demos/hello-world.html
 class TimeRangeComponent(
   startRef: SignallingRef[IO, LocalDateTime],
   endRef: SignallingRef[IO, LocalDateTime],
@@ -31,13 +30,10 @@ class TimeRangeComponent(
                       p("Start: "),
                       input.withSelf{ self => 
                         (
-                          // idAttr := "start-time",
                           `type` := "datetime-local",
                           value  := s"${start.format(formatter)}",
-                          // maxAttr := s"${end.format(formatter)}",
                           maxAttr <-- endRef.map(time => time.format(formatter)),
                           minAttr := "1970-01-01 00:00",
-                          //from https://www.armanbilge.com/calico/demos/counter.html
                           onChange --> {
                             _.evalMap(_ => self.value.get).filter(_.nonEmpty).foreach {v =>
                               val inputElem = self.asInstanceOf[HTMLInputElement]
@@ -51,20 +47,10 @@ class TimeRangeComponent(
                               }
                               }
                           }
-                          // onChange{ _ =>  
-                          //   check non empty
-                          //   val inputElm = self.asInstanceOf[HTMLInputElement]
-                          //   if (inputElm.checkValidity()) {
-                          //     self.value.get.flatMap(v => IO.println(v))
-                          //   } else {
-                          //     IO.unit
-                          //   }
-                          // }
-                          // onChange --> (_.foreach(e =>   )
                         )
                        
                       },
-                      //validity icon stuff from https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/datetime-local
+                      //validity icon from https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/datetime-local
                       span(cls := "validity"),
                     ) 
       endInput    <- div(
@@ -74,7 +60,6 @@ class TimeRangeComponent(
                         (
                           idAttr := "end-time",
                           `type` := "datetime-local",
-                          // value := s"${end.format(formatter)}",
                           value <-- endRef.map(time => time.format(formatter)),
                           minAttr <-- startRef.map(time => time.format(formatter)),
                           onClick(_ => {
@@ -89,7 +74,6 @@ class TimeRangeComponent(
                                   case Left(value) => throw new IllegalArgumentException(
                                     "Invalid time") 
                                   case Right(value) => {
-                                    // val time = value.atZone(ZoneId.of("UTC"))
                                     liveRef.set(false) >>
                                     endRef.set(value)
                                   }

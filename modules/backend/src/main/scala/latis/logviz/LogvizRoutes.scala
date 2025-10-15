@@ -43,10 +43,6 @@ class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
       // hard coding times for now
       val end: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
       val start: LocalDateTime = end.minusHours(24)
-      // val start: LocalDateTime = LocalDateTime.now().toLocalDate().atStartOfDay()
-      // println(start)
-      // println(end)
-
       val events = eventsource.getEvents(start, end)
       val sse: EventStream[IO] = events.map(eventToServerSent)
 

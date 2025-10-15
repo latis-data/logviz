@@ -8,42 +8,11 @@ import cats.syntax.all.*
 import latis.logviz.model.RequestEvent
 import latis.logviz.model.Event
 
-/**
-  * Gets an unused column from the pq
-  * 
-  * Partial events cannot be assigned an already used column or else
-  * they will overlap over the existing events in that column because they 
-  * extend all the way to the start of the canvas. 
-  * 
-  * Thus, given a partial event, it must be the first event drawn on the column it's assigned
-  *
-  * @param pq
-  * @param acc used to store the columns that were already used, pushed back into PQ once found an unused column
-  * @return returns an Option, which will either be an unused column or none. None meaning that there's 
-  * no more unused columns available in the PQ which indicates that we need to increase the size of the PQ(more total columns)
-  */
-private def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column] = Nil): IO[Option[Column]] = {
-  //instead of keeping track of the number of concurrent columns and subtracting from the max for base case, I can just use tryTake!
-  pq.tryTake.flatMap{
-    case Some(col) =>  
-      if (col.used) {
-        getUnusedColumn(pq, col :: acc)
-      } else {
-          acc.traverse(pq.offer(_))
-          >> IO(Some(col.copy(used = true)))
-      }
-    case None =>
-      //pq is empty: meaning no columns that are unused -> need to increase max number of columns
-      acc.traverse(pq.offer(_))
-      >> IO(None)
-    }
-}
-
 trait EventParser {
   def parse(event: Event): IO[Unit]
   def getEvents(): IO[List[(RequestEvent, Int)]]
   def getMaxConcurrent(): IO[Int]
- 
+  def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column] = Nil): IO[Option[Column]]
 }
 
 /**
@@ -264,9 +233,37 @@ object EventParser {
           comp        =  compEvents.map((event, col) => (event, col.number))
         } yield(comp ++ events)
 
-      override def getMaxConcurrent(): IO[Int] = {
+      override def getMaxConcurrent(): IO[Int] = 
         maxCounter.get
-      }
+
+      /**
+        * Gets an unused column from the pq
+        * 
+        * Partial events cannot be assigned an already used column or else
+        * they will overlap over the existing events in that column because they 
+        * extend all the way to the start of the canvas. 
+        * 
+        * Thus, given a partial event, it must be the first event drawn on the column it's assigned
+        *
+        * @param pq
+        * @param acc used to store the columns that were already used, pushed back into PQ once found an unused column
+        * @return returns an Option, which will either be an unused column or none. None meaning that there's 
+        * no more unused columns available in the PQ which indicates that we need to increase the size of the PQ(more total columns)
+        */
+      override def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column]): IO[Option[Column]] = 
+        pq.tryTake.flatMap{
+          case Some(col) =>  
+            if (col.used) {
+              getUnusedColumn(pq, col :: acc)
+            } else {
+                acc.traverse(pq.offer(_))
+                >> IO(Some(col.copy(used = true)))
+            }
+          case None =>
+            //pq is empty: meaning no columns that are unused -> need to increase max number of columns
+            acc.traverse(pq.offer(_))
+            >> IO(None)
+        }
     }
   }
 }
