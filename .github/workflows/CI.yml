@@ -6,12 +6,10 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: coursier/setup-action@v1
         with:
           jvm: adopt:11
       - uses: coursier/cache-action@v6
-      - name: Update package lists
-        run: sudo apt-get update
       - name: Run tests
         run: sbt -v +test
