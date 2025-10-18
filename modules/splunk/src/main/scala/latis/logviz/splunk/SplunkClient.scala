@@ -16,7 +16,7 @@ import org.typelevel.ci.CIString
 import latis.logviz.model.Event
 
 trait SplunkClient {
-  def query(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event]
+  def query(start: LocalDateTime, end: LocalDateTime, source: String, index: String): Stream[IO, Event]
 }
 
 object SplunkClient {
@@ -157,11 +157,11 @@ object SplunkClient {
             eStrm
           }
 
-          def query(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] = {
+          def query(start: LocalDateTime, end: LocalDateTime, source: String, index: String): Stream[IO, Event] = {
             // make the query from args
             val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
             val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
-            val query = s"search index=latis source=latis3-swp* earliest_time=$eTime latest_time=$lTime | reverse"
+            val query = s"search index=$index source=$source earliest_time=$eTime latest_time=$lTime | reverse"
 
             Stream.eval {
               for {

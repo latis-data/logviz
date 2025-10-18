@@ -10,7 +10,9 @@ enum SplunkConfig {
   case Enabled(
     uri: Uri,
     username: String,
-    password: String
+    password: String,
+    source: String,
+    index: String
   )
 }
 
@@ -22,7 +24,9 @@ object SplunkConfig {
         case true => (
           c.atKey("uri").flatMap(ConfigReader[Uri].from),
           c.atKey("username").flatMap(_.asString),
-          c.atKey("password").flatMap(_.asString)
+          c.atKey("password").flatMap(_.asString),
+          c.atKey("source").flatMap(_.asString),
+          c.atKey("index").flatMap(_.asString)
         ).mapN(SplunkConfig.Enabled.apply)
       }
     }
