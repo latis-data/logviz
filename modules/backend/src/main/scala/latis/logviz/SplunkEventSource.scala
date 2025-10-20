@@ -8,7 +8,12 @@ import fs2.Stream
 import latis.logviz.model.Event
 import latis.logviz.splunk.*
 
-class SplunkEventSource(sclient: SplunkClient, source: String, index: String) extends EventSource {
+/** A Splunk event source that reads events from Splunk
+ * 
+ * @constructor create a new splunk source with a splunk client
+ * @param sclient the emberClient used to access splunk
+ */
+class SplunkEventSource(sclient: SplunkClient) extends EventSource {
   override def getEvents(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] = {
     sclient.query(start, end, source, index)
   }
