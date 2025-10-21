@@ -38,7 +38,7 @@ lazy val app = project
       "co.fs2" %% "fs2-core" % fs2Version,
       "org.http4s" %% "http4s-ember-server" % http4sVersion,
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion,
-      "ch.qos.logback" % "logback-classic" % "1.5.18" % Runtime
+      "ch.qos.logback" % "logback-classic" % "1.5.20" % Runtime
     ),
     run / fork := true
   )
@@ -112,7 +112,7 @@ lazy val splunk = project
       "org.http4s" %%% "http4s-circe" % http4sVersion,
       "org.http4s" %%% "http4s-dsl" % http4sVersion,
       "org.http4s" %%% "http4s-ember-client" % http4sVersion,
-      "ch.qos.logback" % "logback-classic" % "1.5.18",
+      "ch.qos.logback" % "logback-classic" % "1.5.20",
       "com.github.pureconfig" %%% "pureconfig-core" % pureconfigVersion,
       "com.github.pureconfig" %%% "pureconfig-cats-effect" % pureconfigVersion,
       "com.github.pureconfig" %%% "pureconfig-http4s" % pureconfigVersion
