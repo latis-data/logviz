@@ -3,7 +3,7 @@ ThisBuild / scalaVersion := "3.3.6"
 
 val catsVersion = "2.13.0"
 val catsEffectVersion = "3.6.3"
-val fs2Version = "3.12.0"
+val fs2Version = "3.12.2"
 val http4sVersion = "0.23.30"
 val log4catsVersion = "2.7.1"
 val circeVersion = "0.14.13"
