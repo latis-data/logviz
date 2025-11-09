@@ -9,7 +9,6 @@ import cats.effect.IO
 import cats.effect.Resource
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
-import fs2.concurrent.SignallingRef
 import org.http4s.dom.FetchClientBuilder
 import org.http4s.client.Client
 
