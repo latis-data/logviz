@@ -171,7 +171,7 @@ object EventParser {
                               c         <- colCounter.updateAndGet(c => c + 1)
                               _         <- maxCounter.update(prev => math.max(prev, c))
                               _         <- compEventsRef.update(lst => 
-                                            (RequestEvent.Partial(time, s"partial success event- start time unknown. Duration: $duration"), 
+                                            (RequestEvent.Partial(time, s"partial success event- start time unknown. duration: $duration"), 
                                             currDepth) +: lst)
                             } yield(currDepth)
                         }
@@ -207,7 +207,7 @@ object EventParser {
                               c         <- colCounter.updateAndGet(c => c + 1)
                               _         <- maxCounter.update(prev => math.max(prev, c))
                               _         <- compEventsRef.update(lst => 
-                                            (RequestEvent.Partial(time, s"partial failure event- start time unknown. Error: $msg"), 
+                                            (RequestEvent.Partial(time, s"partial failure event- start time unknown. error msg: $msg"), 
                                             currDepth) +: lst)
                             } yield(currDepth)
                         }

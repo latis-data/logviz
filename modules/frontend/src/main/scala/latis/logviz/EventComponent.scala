@@ -352,11 +352,18 @@ class EventComponent(
                                 EventDetails("Request", start, "ongoing", "ongoing", s"$shortUrl")
                               case RequestEvent.Success(start, url, end, duration) =>
                                 val shortUrl = url.split("\\?")(0)
-                                println(shortUrl)
                                 EventDetails("Success", start, end, s"$duration ms", s"$shortUrl")
                               case RequestEvent.Failure(start, url, end, msg) => 
                                 val duration = Duration.between(LocalDateTime.parse(start), LocalDateTime.parse(end))
                                 EventDetails(s"Failure: $msg", start, end, s"$duration ms", url)
+                              case RequestEvent.Partial(end, msg) =>
+                                if (msg.contains("msg: ")) {
+                                  val error = msg.split("msg: ")(1)
+                                  EventDetails(s"Failure: $error", "unknown", end, "failed", "unknown")
+                                } else {
+                                  val duration = msg.split("duration: ")(1)
+                                  EventDetails("Success", "unknown", end, duration, "unknown")
+                                }
                             }
                             
                             // updating the ref

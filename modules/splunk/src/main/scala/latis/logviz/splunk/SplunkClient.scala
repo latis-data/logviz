@@ -215,7 +215,7 @@ object SplunkClient {
             * @param start the start time used to filter for events
             * @param end the end time used to filter for events
             */
-          def query(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] = {
+          def query(start: LocalDateTime, end: LocalDateTime, source: String, index: String): Stream[IO, Event] = {
             // make the query from args
             val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
             val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
