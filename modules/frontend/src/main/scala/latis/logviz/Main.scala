@@ -7,6 +7,7 @@ import calico.IOWebApp
 import calico.html.io.{*, given}
 import cats.effect.IO
 import cats.effect.Resource
+import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
 import fs2.concurrent.SignallingRef
 import org.http4s.dom.FetchClientBuilder
@@ -28,7 +29,7 @@ object Main extends IOWebApp {
 
     for {
       ec          <- client
-      requestH1   <- h1(idAttr:= "request")
+      eventRef    <- Resource.eval(SignallingRef[IO].of[Option[EventDetails]](None))
       now         <- Resource.eval(IO(LocalDateTime.now(ZoneOffset.UTC)))
       startRef    <- Resource.eval(SignallingRef[IO].of(now.minusHours(24)))
 
@@ -56,12 +57,12 @@ object Main extends IOWebApp {
       //changes that are currently unused due to waiting on eventComponent rework will be marked with ***
       timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render //***
 
-
-      component   =  new EventComponent(ec.getEvents, requestH1, startRef, endRef, liveRef)
+      evComponent =  new EventDetailComponent(eventRef)
+      info        <- evComponent.render
       timeline    <- component.render
 
       // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange) /***
-      requestInfo <- div(idAttr:= "request-detail", requestH1)
+      requestInfo <- div(idAttr:= "request-detail", info)
       box         <- div(idAttr:= "box", timeline, requestInfo)
       html        <- div(idAttr:= "container", box)
       
