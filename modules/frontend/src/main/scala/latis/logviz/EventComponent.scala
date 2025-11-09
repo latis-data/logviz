@@ -37,7 +37,7 @@ import cats.effect.std.Supervisor
   */
 class EventComponent(
   stream: Stream[IO, Event],
-  requestDetails: HtmlElement[IO],
+  eventRef: Ref[IO, Option[EventDetails]],
   startTime: SignallingRef[IO, LocalDateTime],
   endTime: SignallingRef[IO, LocalDateTime],
   liveRef: SignallingRef[IO, Boolean]
@@ -74,7 +74,7 @@ class EventComponent(
                       isLive, 
                       rectRef,
                       prevEndRef)
-      _           <- hover(canvas, requestDetails.asInstanceOf[HTMLElement], rectRef)
+      _           <- hover(canvas, eventRef, rectRef)
     } yield(timeline)
   
   /**
@@ -325,7 +325,7 @@ class EventComponent(
   */
   private def hover(
     canvas: HTMLCanvasElement,
-    requestDetails: HTMLElement,
+    eventRef: Ref[IO, Option[EventDetails]],
     rectRef: Ref[IO, List[Rectangle]]
     ): Resource[IO, Dispatcher[IO]]  =
     Dispatcher.sequential[IO] evalTap { dispatcher =>
@@ -340,29 +340,27 @@ class EventComponent(
             _ <-  rectRef.get.flatTap { rects =>
                     rects.traverse {
                       case Rectangle(event, x, y, width, height, color) => {
-                        if (mouseX >= x && mouseX <= x + width 
-                            && mouseY <= y && mouseY >= y + height) {
-                          IO{
+                        if (mouseX >= x && mouseX <= x + width && mouseY <= y && mouseY >= y + height) {
                             val ev = event(0) // event is a (RequestEvent, Int)
-                            // we currently don't get the correlation id or thread id
 
-                            // get path, start time, end time, elapsed time, thread id, and if there was an exception (None)
-                            val info: String = ev match {
+                            // make an EventDetails object
+                            val info: EventDetails = ev match {
                               case RequestEvent.Server(time) =>
-                                s"Event: Start\ntime: $time"
+                                EventDetails("Start", time, "", "", "")
                               case RequestEvent.Request(start, url) =>
-                                val shortUrl = url.split(" Headers")(0)
-                                val duration = Duration.between(LocalDateTime.parse(start), LocalDateTime.now(ZoneOffset.UTC))
-                                s"Event: Request\r\nPath: $shortUrl\r\nStart Time: $start\r\nEnd Time: Ongoing\r\nElapsed: ${duration.toMinutesPart()} minutes, ${duration.toSecondsPart()} seconds\r\nException: (None)"
+                                val shortUrl = url.split("\\?")(0)
+                                EventDetails("Request", start, "ongoing", "ongoing", s"$shortUrl")
                               case RequestEvent.Success(start, url, end, duration) =>
-                                val shortUrl = url.split(" Headers")(0)
-                                s"Event: Success\r\nPath: $shortUrl\r\nStart Time: $start\r\nEnd Time: $end\r\nElapsed: $duration ms\r\nException: (None)"
-                              case RequestEvent.Failure(start, url, end, msg) => s"$event"
+                                val shortUrl = url.split("\\?")(0)
+                                println(shortUrl)
+                                EventDetails("Success", start, end, s"$duration ms", s"$shortUrl")
+                              case RequestEvent.Failure(start, url, end, msg) => 
+                                val duration = Duration.between(LocalDateTime.parse(start), LocalDateTime.parse(end))
+                                EventDetails(s"Failure: $msg", start, end, s"$duration ms", url)
                             }
-                            requestDetails.style.fontSize = "20px"
-                            requestDetails.style.whiteSpace = "pre"
-                            requestDetails.textContent = info
-                          }
+                            
+                            // updating the ref
+                            eventRef.set(Some(info))
                         } else {
                           IO.unit
                         }
