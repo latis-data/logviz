@@ -41,10 +41,11 @@ class EventComponent(
   eventRef: Ref[IO, Option[EventDetails]],
   startTime: SignallingRef[IO, LocalDateTime],
   endTime: SignallingRef[IO, LocalDateTime],
-  liveRef: SignallingRef[IO, Boolean]
+  liveRef: SignallingRef[IO, Boolean],
+  zoomRef: Ref[IO, Double]
   ) {
   val timestampFormatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:00")
-  val pixelsPerSec = 1.0
+  // val pixelsPerSec = 1.0
 
  
   /**
@@ -86,7 +87,7 @@ class EventComponent(
    * Same as saying how far off we are from the top of canvas(current time)
    * [[https://www.geeksforgeeks.org/java/java-time-duration-class-in-java/#]]
   */
-  private def convertTime(timestamp: LocalDateTime, current: LocalDateTime): Double = 
+  private def convertTime(timestamp: LocalDateTime, current: LocalDateTime, pixelsPerSec: Double): Double = 
     java.time.Duration.between(timestamp, current).toSeconds() * pixelsPerSec
 
   /**
@@ -115,7 +116,8 @@ class EventComponent(
     rects: List[Rectangle],
     cols: Int,
     top: Double,
-    width: Int
+    width: Int,
+    pixelsPerSec: Double
   ): IO[Unit] =
 
     //computes what the top of the canvas(viewport) is
@@ -151,7 +153,7 @@ class EventComponent(
       _ <- (0 to mins).toList
             .traverse{ min =>
               val timestamp = currTruncated.minusMinutes(min)
-              val y = convertTime(timestamp, topTS).toDouble
+              val y = convertTime(timestamp, topTS, pixelsPerSec).toDouble
               drawTS(context, y, timestamp)
             }
       _ <- rects.traverse{
@@ -226,6 +228,7 @@ class EventComponent(
           prevEnd <- prevEndRef.get
           end     <- endTime.get
           liveTog <- liveRef.get
+          zoomLev <- zoomRef.get
 
           //*** liveTog will currently always be true 
 
@@ -250,7 +253,7 @@ class EventComponent(
                         //grabbing the current time to be used as endtime/top of canvas
                         endTime <- IO(LocalDateTime.now(ZoneOffset.UTC))
                         //updating sizer height used for how much you can scroll
-                        _       <- IO(sizer.style.height = s"${convertTime(start, endTime)-height}px")
+                        _       <- IO(sizer.style.height = s"${convertTime(start, endTime, zoomLev)-height}px")
 
                         maxCol  <- parser.getMaxConcurrent()
                         events  <- parser.getEvents()
@@ -259,7 +262,8 @@ class EventComponent(
                                    top,
                                    width/maxCol,
                                    events,
-                                   start)
+                                   start,
+                                   zoomLev)
                         _       <- rectRef.update(_ => rects)
                         _       <- drawCanvas(endTime,
                                     canvas,
@@ -267,7 +271,8 @@ class EventComponent(
                                     rects,
                                     maxCol,
                                     top,
-                                    width)
+                                    width,
+                                    zoomLev)
                         _       <- prevScrollPos.update(_ => top)
                         _       <- if (top == 0.0) {
                                     isLive.update(_ => true)
@@ -285,7 +290,7 @@ class EventComponent(
                           _       <- IO(canvas.width = tlRect.width.toInt)
                           _       <- IO(canvas.height = tlRect.height.toInt)
                           width   <- IO(canvas.width - 150)
-                          _       <- IO(sizer.style.height = s"${convertTime(start, end)-height}px")
+                          _       <- IO(sizer.style.height = s"${convertTime(start, end, zoomLev)-height}px")
                           maxCol  <- parser.getMaxConcurrent()
                           events  <- parser.getEvents()
                           rects   = Rectangles.makeRectangles(end,
@@ -293,7 +298,8 @@ class EventComponent(
                                     top,
                                     width/maxCol,
                                     events,
-                                    start)
+                                    start,
+                                    zoomLev)
                           _       <- rectRef.update(_ => rects)
                           _       <- drawCanvas(end,
                                       canvas,
@@ -301,7 +307,8 @@ class EventComponent(
                                       rects,
                                       maxCol,
                                       top,
-                                      width)
+                                      width,
+                                      zoomLev)
                           _       <- prevScrollPos.update(_ => top)
                           _       <- prevEndRef.set(end)
                         } yield()
