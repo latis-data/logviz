@@ -58,6 +58,7 @@ object Main extends IOWebApp {
 
       evComponent =  new EventDetailComponent(eventRef)
       info        <- evComponent.render
+      component   =  new EventComponent(ec.getEvents, eventRef, startRef, endRef, liveRef)
       timeline    <- component.render
 
       // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange) /***

@@ -22,6 +22,7 @@ import fs2.Stream
 
 import latis.logviz.model.Event
 import latis.logviz.model.Rectangle
+import latis.logviz.model.RequestEvent
 import cats.effect.std.Supervisor
 
 
