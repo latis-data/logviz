@@ -21,8 +21,10 @@ class ZoomComponent(zoomLevel: Ref[IO, Double]) {
   def render: Resource[IO, HtmlElement[IO]] = 
     div(
       idAttr:= "zoom", 
-      div(idAttr:= "zoom+-",
+      div(
         button(
+          cls:= "zoom-button",
+          typ := "button",
           "-",
           onClick {
             zoomLevel.update(z => math.max(0.2, z - 0.1))
@@ -32,50 +34,59 @@ class ZoomComponent(zoomLevel: Ref[IO, Double]) {
           "ZOOM"
         ),
         button(
+          cls:= "zoom-button",
+          typ := "button",
           "+",
           onClick {
             zoomLevel.update(z => math.min(10.0, z + 0.1))
           }
         )
       ),
-      div(idAttr:= "zoom-config",
+      div(
         button(
+          typ := "button",
           "0.2x",
           onClick {
             zoomLevel.set(0.2)
           }
         ),
         button(
+          typ := "button",
           "0.5x",
           onClick {
             zoomLevel.set(0.5)
           }
         ),
         button(
+          typ := "button",
           "0.75x",
           onClick {
             zoomLevel.set(0.75)
           }
         ),
         button(
+          typ := "button",
           "1.0x",
           onClick {
             zoomLevel.set(1.0)
           }
         ),
         button(
+          typ := "button",
           "2.0x",
           onClick {
             zoomLevel.set(2.0)
           }
         ),
         button(
+          typ := "button",
           "5.0x",
           onClick {
             zoomLevel.set(5.0)
           }
         ),
         button(
+          typ := "button",
           "10.0x",
           onClick {
             zoomLevel.set(10.0)

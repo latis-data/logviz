@@ -10,7 +10,6 @@ import latis.logviz.model.Rectangle
 
 object Rectangles{
   val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
-  // val pixelsPerSec = 1.0
   //startOffset is used for when to start drawing the columns. Since we have timestamps drawn on the same canvas, we can't just start at x=0. 
   val startOffset = 150
 
