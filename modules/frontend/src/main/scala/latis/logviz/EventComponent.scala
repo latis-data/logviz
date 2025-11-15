@@ -336,12 +336,18 @@ class EventComponent(
         val mouseX = event.clientX - rect.left
         val mouseY = event.clientY - rect.top
 
+        // we need to scale the mouseX and mouseY for how the browser scales the canvas
+        val xscale = canvas.width.toDouble / rect.width
+        val yscale = canvas.height.toDouble / rect.height
+        val scaledX = mouseX * xscale
+        val scaledY = mouseY * yscale
+
         def checkHover: IO[Unit] = {
           for {
             _ <-  rectRef.get.flatTap { rects =>
                     rects.traverse {
                       case Rectangle(event, x, y, width, height, color) => {
-                        if (mouseX >= x && mouseX <= x + width && mouseY <= y && mouseY >= y + height) {
+                        if (scaledX >= x && scaledX <= x + width && scaledY <= y && scaledY >= y + height) {
                             val ev = event(0) // event is a (RequestEvent, Int)
 
                             // make an EventDetails object
