@@ -7,8 +7,6 @@ import cats.effect.Resource
 import fs2.concurrent.Signal
 import fs2.dom.*
 
-case class EventDetails(event: String, start: String, end: String, duration: String, url: String)
-
 /**
   * Given a signallingRef, will take the EventDetails out of the signal 
   * and extract values from the case class to put in a div element that
@@ -19,21 +17,41 @@ case class EventDetails(event: String, start: String, end: String, duration: Str
 class EventDetailComponent(eventDetails: Signal[IO, Option[EventDetails]]) {
   def render: Resource[IO, HtmlElement[IO]] = {
     
-    IO.pure(eventDetails).toResource.flatMap { details =>
-      val event: Signal[IO, EventDetails] = details.map {
-        case Some(event) => event
-        case None => new EventDetails("none", "none", "none", "none", "none")
-      }
-      div(
-        event.map { details => 
-          span(b("Event: "), details.event, br(()),
-            b("Start: "), details.start, br(()),
-            b("End: "), details.end, br(()),
-            b("Duration: "), details.duration, br(()),
-            b("Path: "), details.url
-          )
-        }
-      )
+    val event: Signal[IO, EventDetails] = eventDetails.map {
+      _.getOrElse(EventDetails("none", "none", "none", "none", "none"))
     }
+
+    div(
+      event.map { details => 
+        dl(
+          cls := "request-detail-list",
+          dt(
+            cls := "request-detail-key",
+            "Event"
+          ),
+          dd(details.event),
+          dt(
+            cls := "request-detail-key",
+            "Start"
+          ),
+          dd(details.start),
+          dt(
+            cls := "request-detail-key",
+            "End"
+          ),
+          dd(details.end),
+          dt(
+            cls := "request-detail-key",
+            "Duration"
+          ),
+          dd(details.duration),
+          dt(
+            cls := "request-detail-key",
+            "Path"
+          ),
+          dd(details.url),
+        )
+      }
+    )
   }
 }

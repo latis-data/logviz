@@ -67,3 +67,18 @@ input:valid + span::after {
   padding: 5px;
 }
 
+.request-detail-list
+{
+    display: grid;
+    grid-template-columns: auto 1fr;
+}
+
+.request-detail-key
+{
+    font-weight: bold;
+}
+
+.request-detail-key::after
+{
+  content: ':';
+}

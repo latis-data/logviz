@@ -15,22 +15,13 @@ import org.typelevel.ci.CIString
 
 import latis.logviz.model.Event
 
-/** Describes a client to be used for getting events from Splunk
-  * 
-  * A SplunkClient object must have a query(start, end) method
-  * that returns a stream of events.
-  */
+/** Describes a client to be used for getting events from Splunk */
 trait SplunkClient {
   def query(start: LocalDateTime, end: LocalDateTime, source: String, index: String): Stream[IO, Event]
 }
 
-/** Factory for querying Splunk and parsing output to a stream of Event objects 
-  * 
-  * Uses the `make` method to construct the object. Query method will get 
-  * events from Splunk and return a stream of Event objects.
-  */
 object SplunkClient {
-  /** Creates an emberclient to be used for Splunk access
+  /** Creates a [[SplunkClient]] that uses Splunk's REST API
     *
     * @param splunkuri the uri of Splunk to be accessed
     * @param username the Splunk username for login

@@ -7,12 +7,7 @@ import fs2.Stream
 
 import latis.logviz.model.Event
 
-/** Describes an event source to be used for grabbing events
-  * 
-  * Classes that extend this trait must have a getEvents(start, end) method
-  * which returns a stream of events. Known classes that extend this trait
-  * are JSONEventSource and SplunkEventSource.
-  */
+/** Describes an event source to be used for grabbing events */
 trait EventSource {
   /** Gets events from within a given timeframe
     *
