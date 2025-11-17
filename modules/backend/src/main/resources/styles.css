@@ -15,7 +15,6 @@
 {
     grid-column: span 5;
     grid-row: span 5;
-    display: flex;
     overflow: auto;
 }   
 
@@ -38,10 +37,6 @@
     width: 100%;
     position: sticky;
     top: 0;
-}
-
-#sizer{
-    height: 86400px;
 }
 
 input:invalid + span::after {

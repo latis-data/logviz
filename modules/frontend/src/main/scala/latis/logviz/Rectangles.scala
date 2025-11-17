@@ -111,8 +111,14 @@ object Rectangles{
             val y_end = Duration.between(endTime, currTime).toSeconds() * pixelsPerSec
 
             if (y >= top && y_end < bottomY) {
-              Rectangle((RequestEvent.Partial(time, msg), cDepth),
-              startOffset + cDepth * width, y-top, width, y_end-y, "green") :: acc
+              //scrolled to the point where we should see the partial event go into the past
+              if (y-top <= height) {
+                Rectangle((RequestEvent.Partial(time, msg), cDepth),
+                startOffset + cDepth * width, height, width, y_end-y, "green") :: acc
+              } else {
+                Rectangle((RequestEvent.Partial(time, msg), cDepth),
+                startOffset + cDepth * width, y-top, width, y_end-y, "green") :: acc
+              }
             } else {
               acc
             }

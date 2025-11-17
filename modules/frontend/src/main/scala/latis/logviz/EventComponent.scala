@@ -54,7 +54,7 @@ class EventComponent(
       sup         <- Supervisor[IO](await=true)
       canvasIO    <- canvasTag(idAttr:= "canvas")
       sizer       <- div(idAttr:= "sizer")
-      timeline    <- div(idAttr:= "timeline", sizer, canvasIO)
+      timeline    <- div(idAttr:= "timeline", canvasIO, sizer)
       canvas      =  canvasIO.asInstanceOf[HTMLCanvasElement]
       context     =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
       eParser     <- Resource.eval(EventParser())
@@ -107,8 +107,7 @@ class EventComponent(
    * @param width total available space for columns to be drawn
   */
   private def drawCanvas(
-    current: LocalDateTime,
-    endTime: LocalDateTime,
+    end: LocalDateTime,
     canvas: HTMLCanvasElement,
     context: dom.CanvasRenderingContext2D,
     rects: List[Rectangle],
@@ -116,17 +115,24 @@ class EventComponent(
     top: Double,
     width: Int
   ): IO[Unit] =
-    //TODO: used to interpreting endtime as the "start time" of the time range. change name to match newer changes
 
     //computes what the top of the canvas(viewport) is
     //takes the end date range and subtracts from the scroll position to 
     //know what the timestamp is at the top of the viewport
-    val topTS = current.minusSeconds((top / pixelsPerSec).toLong)
+    val topTS = end.minusSeconds((top / pixelsPerSec).toLong)
     val currTruncated = topTS.truncatedTo(ChronoUnit.MINUTES)
     
     //calculates the number of minutes/timestamps to be drawn
-    val mins = ((math.min(convertTime(endTime, topTS), canvas.height.toDouble) 
-                /pixelsPerSec / 60)).toInt
+    //two scenarios:
+    //  -full canvas viewport of minutes to be drawn
+    //  -as we near the bottom towards the start time, our viewport of minutes to be drawn should decrease(less minutes to draw)
+    // val mins = ((math.min(convertTime(start, topTS), canvas.height.toDouble) 
+    //             /pixelsPerSec / 60)).toInt
+
+    //dont think we actually need the above anymore if we shouldnt be able to scroll past the bottom of the start time anyway. 
+    //number of pixels a viewport is (size of canvas height) / number of pixels per second 
+    //gives us the total number of seconds within a viewport / 60 to give us minutes
+    val mins = (canvas.height.toDouble / pixelsPerSec / 60).toInt
 
     //used for alternating column colors
     val colors = List("lightgray", "white")
@@ -242,7 +248,7 @@ class EventComponent(
                         //grabbing the current time to be used as endtime/top of canvas
                         endTime <- IO(LocalDateTime.now(ZoneOffset.UTC))
                         //updating sizer height used for how much you can scroll
-                        _       <- IO(sizer.style.height = s"${convertTime(start, endTime)+2}px")
+                        _       <- IO(sizer.style.height = s"${convertTime(start, endTime)-height}px")
 
                         maxCol  <- parser.getMaxConcurrent()
                         events  <- parser.getEvents()
@@ -254,7 +260,6 @@ class EventComponent(
                                    start)
                         _       <- rectRef.update(_ => rects)
                         _       <- drawCanvas(endTime,
-                                    start,
                                     canvas,
                                     context,
                                     rects,
@@ -278,7 +283,7 @@ class EventComponent(
                           _       <- IO(canvas.width = tlRect.width.toInt)
                           _       <- IO(canvas.height = tlRect.height.toInt)
                           width   <- IO(canvas.width - 150)
-                          _       <- IO(sizer.style.height = s"${convertTime(start, end)+2}px")
+                          _       <- IO(sizer.style.height = s"${convertTime(start, end)-height}px")
                           maxCol  <- parser.getMaxConcurrent()
                           events  <- parser.getEvents()
                           rects   = Rectangles.makeRectangles(end,
@@ -289,7 +294,6 @@ class EventComponent(
                                     start)
                           _       <- rectRef.update(_ => rects)
                           _       <- drawCanvas(end,
-                                      start,
                                       canvas,
                                       context,
                                       rects,
