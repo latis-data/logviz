@@ -60,7 +60,7 @@ object Rectangles{
               Rectangle((RequestEvent.Server(time), cDepth),
               //offset + the concurrency level + the width of each column tells us the x position of the event which is equal to the x position that the column that the event is in starts at. 
               //y-top gives us the y value to draw the event at since the canvas is offset by the scroll top pixels. 
-              startOffset + cDepth * width, y - top, width, -2, "green") :: acc
+              startOffset + cDepth * width, y - top, width, -2*pixelsPerSec, "green") :: acc
             } else {
               acc
             }
