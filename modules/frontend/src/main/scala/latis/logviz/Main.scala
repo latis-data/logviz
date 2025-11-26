@@ -33,6 +33,7 @@ object Main extends IOWebApp {
       eventRef    <- Resource.eval(SignallingRef[IO].of[Option[EventDetails]](None))
       now         <- Resource.eval(IO(LocalDateTime.now(ZoneOffset.UTC)))
       startRef    <- Resource.eval(SignallingRef[IO].of(now.minusHours(24)))
+      events      <- Resource.eval(SignallingRef[IO].of[Stream[IO, Event]](ec.getEvents))
 
       //***
       endRef      <- Resource.eval(SignallingRef[IO].of(now))
@@ -52,6 +53,16 @@ object Main extends IOWebApp {
                         } yield ()
                       })
                     )
+      changeSource <- button(
+                        `type` := "button",
+                        "Reload Source",
+                        onClick(_ =>
+                          for {
+                            _ <- IO.println("Reloading!")
+                            _ <- events.set(ec.getEvents)
+                          } yield ()
+                        )
+                      )
       //***
 
       //TODO: use later once able to make event request everytime time range changes
@@ -60,11 +71,10 @@ object Main extends IOWebApp {
 
       evComponent =  new EventDetailComponent(eventRef)
       info        <- evComponent.render
-      events      <- Resource.eval(SignallingRef[IO].of[Stream[IO, Event]](ec.getEvents))
       component   =  new EventComponent(events, eventRef, startRef, endRef, liveRef)
       timeline    <- component.render
 
-      // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange) /***
+      // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange, changeSource) //***
       requestInfo <- div(idAttr:= "request-detail", info)
       box         <- div(idAttr:= "box", timeline, requestInfo)
       html        <- div(idAttr:= "container", box)

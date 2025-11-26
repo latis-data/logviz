@@ -61,9 +61,23 @@ class EventComponent(
       canvas      =  canvasIO.asInstanceOf[HTMLCanvasElement]
       context     =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
       eParser     <- Resource.eval(EventParser())
+      parserRef   <- Resource.eval(Ref[IO].of(eParser))
       _           <- Resource.eval(sup.supervise(signal.discrete.switchMap { stream => 
-                      Stream.eval(stream.evalTap{ event =>
-                        eParser.parse(event)
+
+                      // clearing the canvas
+                      context.save();
+                      context.setTransform(1, 0, 0, 1, 0, 0);
+                      context.clearRect(0, 0, canvas.width, canvas.height)
+                      context.restore();
+
+                      // making a new parser
+                      val newParser = for {
+                        parser <- EventParser()
+                        _      <- parserRef.set(parser)
+                      } yield ()
+
+                      Stream.eval(newParser) >> Stream.eval(stream.evalTap{ event =>
+                        parserRef.get.flatTap{_.parse(event)}
                       }.compile.drain)
                     }.compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
@@ -74,7 +88,7 @@ class EventComponent(
       _           <- animate(canvas, 
                       context, 
                       sizer.asInstanceOf[HTMLElement],
-                      eParser,
+                      parserRef,
                       scrollRef, 
                       isLive, 
                       rectRef,
@@ -213,7 +227,7 @@ class EventComponent(
     canvas: HTMLCanvasElement,
     context: dom.CanvasRenderingContext2D,
     sizer: HTMLElement,
-    parser: EventParser,
+    parserRef: Ref[IO, EventParser],
     prevScrollPos: Ref[IO, Double],
     isLive: Ref[IO, Boolean],
     rectRef: Ref[IO, List[Rectangle]],
@@ -230,6 +244,7 @@ class EventComponent(
           prevEnd <- prevEndRef.get
           end     <- endTime.get
           liveTog <- liveRef.get
+          parser  <- parserRef.get
 
           //*** liveTog will currently always be true 
 
