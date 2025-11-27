@@ -422,7 +422,7 @@ class EventComponent(
     currScroll: Double,
     halfViewport: Double,
     zoomRatio: Double
-    ): IO[Double] = 
+    ): IO[Double] = {
 
       //absolute "center" of the viewport. scroll position is relative to the entire height(scrollable area)
       val center = currScroll + halfViewport
@@ -434,6 +434,7 @@ class EventComponent(
       //because the viewport height that the user sees remains the same even if zoom level changes, then we can now 
       //obtain a scroll position such that the new center position is seen as the center of the viewport. 
       val newScroll = newCenter - halfViewport
-      IO(canvas.parentElement.scrollTop = newScroll) >> IO(newScroll)
+      IO(canvas.parentElement.scrollTop = newScroll).as(newScroll) 
+    }
 }
 
