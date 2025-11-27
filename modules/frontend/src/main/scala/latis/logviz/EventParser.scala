@@ -86,8 +86,12 @@ object EventParser {
                               >> IO(currDepth)
                             
                             //Odd error that shouldn't happen, would need to investigate
-                            case Some(_) => throw new IllegalArgumentException(
-                              "Got an event that is not request, something is wrong") 
+                            //offer column back to priority queue since we will not work with this "bad" event anymore
+                            case Some((_, currDepth)) => 
+                              colCounter.update(c => c - 1) >>
+                              pq.offer(currDepth) >>
+                              (IO.raiseError(new Exception(
+                              "Got an event that is not request, something is wrong")))
                         
                             //No request event found, meaning that it was sometime outside of time range. 
                             //Thus, create a completed partial event since error status
@@ -97,8 +101,8 @@ object EventParser {
                               for {
                                 currDepth <- getUnusedColumn(pq).flatMap{
                                               case Some(value) => IO(value)
-                                              case None => throw new IllegalArgumentException(
-                                                "BADD!! No unused column available. Increase number of columns!!!") 
+                                              case None => IO.raiseError(new Exception(
+                                                "BADD!! No unused column available. Increase number of columns!!!"))
                                             }
                                 c         <- colCounter.updateAndGet(c => c + 1)
                                 _         <- maxCounter.update(prev => math.max(prev, c))
@@ -125,8 +129,8 @@ object EventParser {
                           for {
                             cDepth  <- getUnusedColumn(pq).flatMap{
                                         case Some(value) => IO(value)
-                                        case None => throw new IllegalArgumentException(
-                                          "No unused column available. Increase number of columns!!!")
+                                        case None => IO.raiseError(new Exception(
+                                          "No unused column available. Increase number of columns!!!"))
                                       }
                             c       <- colCounter.updateAndGet(c => c + 1)
                             _       <- maxCounter.update(prev => math.max(prev, c))
@@ -156,17 +160,20 @@ object EventParser {
                               currDepth) +: lst)
                             >> IO(currDepth)
 
-                          case Some(_) => throw new IllegalArgumentException(
-                            "Got an event that is not request or partial, something is wrong") 
-                          
+                          case Some((_, currDepth)) => 
+                            colCounter.update(c => c - 1) >>
+                            pq.offer(currDepth) >>
+                            IO.raiseError(new Exception(
+                            "Got an event that is not request or partial, something is wrong"))
+
                           // request and success response somewhere in the past outside of date range
                           // thus, add a completed partial event
                           case None => 
                             for {
                               currDepth <- getUnusedColumn(pq).flatMap{
                                             case Some(value) => IO(value)
-                                            case None => throw new IllegalArgumentException(
-                                              "No unused column available. Increase number of columns!!!")
+                                            case None => IO.raiseError(new Exception(
+                                              "No unused column available. Increase number of columns!!!"))
                                           }
                               c         <- colCounter.updateAndGet(c => c + 1)
                               _         <- maxCounter.update(prev => math.max(prev, c))
@@ -195,14 +202,17 @@ object EventParser {
                               (RequestEvent.Partial(time, s"successful event with response status of: $status, error msg: $msg"), 
                               currDepth) +: lst)
                             >> IO(currDepth)
-                          case Some(_) => throw new IllegalArgumentException(
-                            "Got an event that is not request or partial, something is wrong") 
+                          case Some((_, currDepth)) => 
+                            colCounter.update(c => c - 1) >>
+                            pq.offer(currDepth) >>
+                            IO.raiseError(new Exception(
+                            "Got an event that is not request or partial, something is wrong"))
                           case None =>
                             for {
                               currDepth <- getUnusedColumn(pq).flatMap{
                                             case Some(value) => IO(value)
-                                            case None => throw new IllegalArgumentException(
-                                              "No unused column available. Increase number of columns!!!")
+                                            case None => IO.raiseError(new Exception(
+                                              "No unused column available. Increase number of columns!!!"))
                                           }
                               c         <- colCounter.updateAndGet(c => c + 1)
                               _         <- maxCounter.update(prev => math.max(prev, c))
