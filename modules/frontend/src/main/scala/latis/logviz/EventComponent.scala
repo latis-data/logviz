@@ -63,22 +63,15 @@ class EventComponent(
       eParser     <- Resource.eval(EventParser())
       parserRef   <- Resource.eval(Ref[IO].of(eParser))
       _           <- Resource.eval(sup.supervise(signal.discrete.switchMap { stream => 
-
-                      // clearing the canvas
-                      context.save();
-                      context.setTransform(1, 0, 0, 1, 0, 0);
-                      context.clearRect(0, 0, canvas.width, canvas.height)
-                      context.restore();
-
                       // making a new parser
                       val newParser = for {
                         parser <- EventParser()
                         _      <- parserRef.set(parser)
-                      } yield ()
-
-                      Stream.eval(newParser) >> Stream.eval(stream.evalTap{ event =>
-                        parserRef.get.flatTap{_.parse(event)}
-                      }.compile.drain)
+                      } yield parser
+                      
+                      Stream.eval(newParser).flatMap { parser =>
+                        stream.evalTap(parser.parse)
+                      }
                     }.compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
       isLive      <- Resource.eval(Ref[IO].of(true))

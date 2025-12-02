@@ -58,7 +58,6 @@ object Main extends IOWebApp {
                         "Reload Source",
                         onClick(_ =>
                           for {
-                            _ <- IO.println("Reloading!")
                             _ <- events.set(ec.getEvents)
                           } yield ()
                         )
