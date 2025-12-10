@@ -61,7 +61,7 @@ class EventComponent(
       context     =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
       eParser     <- Resource.eval(EventParser())
       _           <- Resource.eval(sup.supervise(stream.evalTap(event =>
-                      eParser.parse(event)).compile.drain).void)
+                      eParser.parse(event).handleErrorWith(IO.println)).compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
       isLive      <- Resource.eval(Ref[IO].of(true))
       rectRef     <- Resource.eval(Ref[IO].of(List[Rectangle]()))
