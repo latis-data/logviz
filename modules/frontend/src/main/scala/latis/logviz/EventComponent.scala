@@ -42,10 +42,10 @@ class EventComponent(
   eventRef: Ref[IO, Option[EventDetails]],
   startTime: SignallingRef[IO, LocalDateTime],
   endTime: SignallingRef[IO, LocalDateTime],
-  liveRef: SignallingRef[IO, Boolean]
+  liveRef: SignallingRef[IO, Boolean],
+  zoomRef: Ref[IO, Double]
   ) {
   val timestampFormatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:00")
-  val pixelsPerSec = 1.0
 
  
   /**
@@ -73,11 +73,14 @@ class EventComponent(
                         stream.evalTap(parser.parse)
                       }
                     }.compile.drain).void)
+      _           <- Resource.eval(sup.supervise(stream.evalTap(event =>
+                      eParser.parse(event).handleErrorWith(IO.println)).compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
       isLive      <- Resource.eval(Ref[IO].of(true))
       rectRef     <- Resource.eval(Ref[IO].of(List[Rectangle]()))
       end         <- Resource.eval(endTime.get)
       prevEndRef  <- Resource.eval(Ref[IO].of(end))
+      prevZoomRef <- Resource.eval(Ref[IO].of(1.0))
       _           <- animate(canvas, 
                       context, 
                       sizer.asInstanceOf[HTMLElement],
@@ -85,7 +88,8 @@ class EventComponent(
                       scrollRef, 
                       isLive, 
                       rectRef,
-                      prevEndRef)
+                      prevEndRef,
+                      prevZoomRef)
       _           <- hover(canvas, eventRef, rectRef)
     } yield(timeline)
   
@@ -97,7 +101,7 @@ class EventComponent(
    * Same as saying how far off we are from the top of canvas(current time)
    * [[https://www.geeksforgeeks.org/java/java-time-duration-class-in-java/#]]
   */
-  private def convertTime(timestamp: LocalDateTime, current: LocalDateTime): Double = 
+  private def convertTime(timestamp: LocalDateTime, current: LocalDateTime, pixelsPerSec: Double): Double = 
     java.time.Duration.between(timestamp, current).toSeconds() * pixelsPerSec
 
   /**
@@ -126,7 +130,8 @@ class EventComponent(
     rects: List[Rectangle],
     cols: Int,
     top: Double,
-    width: Int
+    width: Int,
+    pixelsPerSec: Double
   ): IO[Unit] =
 
     //computes what the top of the canvas(viewport) is
@@ -162,7 +167,7 @@ class EventComponent(
       _ <- (0 to mins).toList
             .traverse{ min =>
               val timestamp = currTruncated.minusMinutes(min)
-              val y = convertTime(timestamp, topTS).toDouble
+              val y = convertTime(timestamp, topTS, pixelsPerSec).toDouble
               drawTS(context, y, timestamp)
             }
       _ <- rects.traverse{
@@ -224,19 +229,22 @@ class EventComponent(
     prevScrollPos: Ref[IO, Double],
     isLive: Ref[IO, Boolean],
     rectRef: Ref[IO, List[Rectangle]],
-    prevEndRef: Ref[IO, LocalDateTime]
+    prevEndRef: Ref[IO, LocalDateTime],
+    prevZoomRef: Ref[IO, Double]
   ): Resource[IO, Dispatcher[IO]] =
     Dispatcher.sequential[IO] evalTap{ dispatcher => 
 
       def go(timestamp: Double): IO[Unit] = 
         for {
-          top     <- IO(canvas.parentElement.scrollTop)
-          live    <- isLive.get
-          prevTop <- prevScrollPos.get
-          start   <- startTime.get
-          prevEnd <- prevEndRef.get
-          end     <- endTime.get
-          liveTog <- liveRef.get
+          top       <- IO(canvas.parentElement.scrollTop)
+          live      <- isLive.get
+          prevTop   <- prevScrollPos.get
+          start     <- startTime.get
+          prevEnd   <- prevEndRef.get
+          end       <- endTime.get
+          liveTog   <- liveRef.get
+          prevZoom  <- prevZoomRef.get
+          zoomLev   <- zoomRef.get
           parser  <- parserRef.get
 
           //*** liveTog will currently always be true 
@@ -246,7 +254,7 @@ class EventComponent(
           //so live button tells us to allow live updating when at the top hence need for both liveTog and live
 
           //if liveTog(want live updates when at the top) and if live(meaning we're at top of the canvas) then we always redraw each animation frame
-          _       <- if (liveTog && (live || prevTop != top)) {
+          _       <- if (liveTog && (live || prevTop != top || prevZoom != zoomLev)) {
 
                       for {
                         //if user changes size of browser or anything, then just adjusting canvas to fit those changes
@@ -262,60 +270,75 @@ class EventComponent(
                         //grabbing the current time to be used as endtime/top of canvas
                         endTime <- IO(LocalDateTime.now(ZoneOffset.UTC))
                         //updating sizer height used for how much you can scroll
-                        _       <- IO(sizer.style.height = s"${convertTime(start, endTime)-height}px")
-
+                        _       <- IO(sizer.style.height = s"${convertTime(start, endTime, zoomLev)-height}px")
+                        newTop  <- if (prevZoom != zoomLev) {
+                                    updateScrollTop(canvas, top, height/2, zoomLev/prevZoom)
+                                  } else {
+                                    IO(top)
+                                  }
                         maxCol  <- parser.getMaxConcurrent()
                         events  <- parser.getEvents()
                         rects   = Rectangles.makeRectangles(endTime,
                                    height,
-                                   top,
+                                   newTop,
                                    width/maxCol,
                                    events,
-                                   start)
+                                   start,
+                                   zoomLev)
                         _       <- rectRef.update(_ => rects)
                         _       <- drawCanvas(endTime,
                                     canvas,
                                     context,
                                     rects,
                                     maxCol,
-                                    top,
-                                    width)
-                        _       <- prevScrollPos.update(_ => top)
-                        _       <- if (top == 0.0) {
+                                    newTop,
+                                    width,
+                                    zoomLev)
+                        _       <- prevScrollPos.update(_ => newTop)
+                        _       <- if (newTop == 0.0) {
                                     isLive.update(_ => true)
                                   } else {
                                     isLive.update(_ => false)
                                   }
+                        _       <- prevZoomRef.set(zoomLev)
                       } yield ()
 
                       //*** unused until timecomponent is re-introduced
                       //only redraw when scrolling or there are changes if live is not toggled
-                    } else if (!liveTog && (prevEnd != end || prevTop != top)){
+                    } else if (!liveTog && (prevEnd != end || prevTop != top || prevZoom != zoomLev)){
                         for {
                           tlRect  <- IO(canvas.parentElement.getBoundingClientRect())
                           height  =  tlRect.height
                           _       <- IO(canvas.width = tlRect.width.toInt)
                           _       <- IO(canvas.height = tlRect.height.toInt)
                           width   <- IO(canvas.width - 150)
-                          _       <- IO(sizer.style.height = s"${convertTime(start, end)-height}px")
+                          _       <- IO(sizer.style.height = s"${convertTime(start, end, zoomLev)-height}px")
+                          newTop  <- if (prevZoom != zoomLev) {
+                                    updateScrollTop(canvas, top, height/2, zoomLev/prevZoom)
+                                  } else {
+                                    IO(top)
+                                  }
                           maxCol  <- parser.getMaxConcurrent()
                           events  <- parser.getEvents()
                           rects   = Rectangles.makeRectangles(end,
                                     height,
-                                    top,
+                                    newTop,
                                     width/maxCol,
                                     events,
-                                    start)
+                                    start,
+                                    zoomLev)
                           _       <- rectRef.update(_ => rects)
                           _       <- drawCanvas(end,
                                       canvas,
                                       context,
                                       rects,
                                       maxCol,
-                                      top,
-                                      width)
-                          _       <- prevScrollPos.update(_ => top)
+                                      newTop,
+                                      width,
+                                      zoomLev)
+                          _       <- prevScrollPos.update(_ => newTop)
                           _       <- prevEndRef.set(end)
+                          _       <- prevZoomRef.set(zoomLev)
                         } yield()
                     } else {
                       IO.unit
@@ -397,6 +420,35 @@ class EventComponent(
         }
         dispatcher.unsafeRunAndForget(checkHover)
       })
+    }
+
+  /**
+   * Updates and returns the new scroll position after zooming
+   * 
+   * @param canvas
+   * @param currScroll scroll top position before zoom
+   * @param halfViewport height of viewport/canvas that user sees divided in half
+   * @param zoomRatio new zoom level / previous zoom level 
+   * @return new scroll top position
+  */
+  private def updateScrollTop(
+    canvas: HTMLCanvasElement,
+    currScroll: Double,
+    halfViewport: Double,
+    zoomRatio: Double
+    ): IO[Double] = {
+
+      //absolute "center" of the viewport. scroll position is relative to the entire height(scrollable area)
+      val center = currScroll + halfViewport
+
+      //multiplying center by the zoomRatio gives us the new center that we want to be the "center" of the viewport
+      //the same timestep should also be at this position(that's why we want this)
+      val newCenter = center * zoomRatio
+
+      //because the viewport height that the user sees remains the same even if zoom level changes, then we can now 
+      //obtain a scroll position such that the new center position is seen as the center of the viewport. 
+      val newScroll = newCenter - halfViewport
+      IO(canvas.parentElement.scrollTop = newScroll).as(newScroll) 
     }
 }
 

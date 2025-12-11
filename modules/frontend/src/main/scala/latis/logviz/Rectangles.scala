@@ -10,7 +10,6 @@ import latis.logviz.model.Rectangle
 
 object Rectangles{
   val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
-  val pixelsPerSec = 1.0
   //startOffset is used for when to start drawing the columns. Since we have timestamps drawn on the same canvas, we can't just start at x=0. 
   val startOffset = 150
 
@@ -41,7 +40,8 @@ object Rectangles{
     top: Double,
     width: Int, 
     events: List[(RequestEvent, Int)],
-    startTime: LocalDateTime
+    startTime: LocalDateTime,
+    pixelsPerSec: Double
   ): List[Rectangle] =
     //top(how much we've scrolled from the top) + height(viewport) tells us what the bottom "timestamp"/y position currently is
     val bottomY = top + height
@@ -60,7 +60,7 @@ object Rectangles{
               Rectangle((RequestEvent.Server(time), cDepth),
               //offset + the concurrency level + the width of each column tells us the x position of the event which is equal to the x position that the column that the event is in starts at. 
               //y-top gives us the y value to draw the event at since the canvas is offset by the scroll top pixels. 
-              startOffset + cDepth * width, y - top, width, -2, "green") :: acc
+              startOffset + cDepth * width, y - top, width, -2*pixelsPerSec, "green") :: acc
             } else {
               acc
             }

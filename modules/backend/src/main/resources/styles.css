@@ -13,7 +13,7 @@
 
 #timeline
 {
-    grid-column: span 5;
+    grid-column: span 4;
     grid-row: span 5;
     overflow: auto;
 }   
@@ -81,4 +81,21 @@ input:valid + span::after {
 .request-detail-key::after
 {
   content: ':';
+}
+
+#zoom{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.zoom-button{
+  font-weight: bold;
+  font-size: 15px;
+  border: none;
+  background-color: transparent;
+}
+
+.zoom-button:hover{
+  background-color: grey;
 }

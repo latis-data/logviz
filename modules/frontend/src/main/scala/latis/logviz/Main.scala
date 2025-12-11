@@ -8,12 +8,14 @@ import calico.html.io.{*, given}
 import cats.effect.IO
 import cats.effect.Resource
 import fs2.Stream
+import cats.effect.kernel.Ref
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
 import org.http4s.dom.FetchClientBuilder
 import org.http4s.client.Client
 
 import latis.logviz.model.Event
+
 
 /**
  * Renders HTML elements for log events using EventClient and EventComponent
@@ -63,19 +65,23 @@ object Main extends IOWebApp {
                         )
                       )
       //***
-
       //TODO: use later once able to make event request everytime time range changes
       //changes that are currently unused due to waiting on eventComponent rework will be marked with ***
-      timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render //***
+      timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
+      // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange, changeSource)
+      //***
+
+      //zoom ref might not need to be a signallingref since we're checking every animation frame
+      zoomRef     <- Resource.eval(Ref[IO].of(1.0))
+      zoom        <- new ZoomComponent(zoomRef).render
 
       evComponent =  new EventDetailComponent(eventRef)
       info        <- evComponent.render
-      component   =  new EventComponent(events, eventRef, startRef, endRef, liveRef)
+      component   =  new EventComponent(ec.getEvents, eventRef, startRef, endRef, liveRef, zoomRef)
       timeline    <- component.render
 
-      // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange, changeSource) //***
       requestInfo <- div(idAttr:= "request-detail", info)
-      box         <- div(idAttr:= "box", timeline, requestInfo)
+      box         <- div(idAttr:= "box", timeline, zoom, requestInfo)
       html        <- div(idAttr:= "container", box)
       
   } yield html
