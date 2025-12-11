@@ -1,7 +1,6 @@
 package latis.logviz
 
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 import scala.concurrent.duration._
 
@@ -56,10 +55,9 @@ class JSONEventSource extends EventSource {
           //makes it easier for distinguishing future and past events
           //if offset was off start time, then negative offset events would never get drawn 
           //and harder to partition positive offset events into past and future
-          val curr = LocalDateTime.now(ZoneOffset.UTC)
           Stream.eval(Queue.unbounded[IO, Option[Event]]).flatMap{ queue => 
               Stream.eval(past.traverse{e => 
-                  val event = eventOffsetToTime(e, curr)
+                  val event = eventOffsetToTime(e, end)
                   val time = getEventTime(event)
                   //no need to have events outside of start time as part of the stream
                   if (time.isBefore(start)) {
@@ -77,9 +75,9 @@ class JSONEventSource extends EventSource {
                 ).flatMapN { (sup, c) => 
                   Stream.evalSeq(
                     future.traverse{ e => 
-                      val event = eventOffsetToTime(e, curr)
+                      val event = eventOffsetToTime(e, end)
                       val time = getEventTime(event)
-                      val timer = java.time.Duration.between(LocalDateTime.now(ZoneOffset.UTC), time).toMillis()
+                      val timer = java.time.Duration.between(end, time).toMillis()
                       sup.supervise(IO.sleep(timer.milliseconds) >> queue.offer(Some(event)) >> c.release).void
                     }) ++ Stream.eval(c.await) ++ Stream.eval(queue.offer(None)) 
                 }
