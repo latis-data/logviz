@@ -16,6 +16,7 @@ import cats.effect.Resource
 import cats.syntax.all.*
 import cats.effect.std.Dispatcher
 import cats.effect.kernel.Ref
+import fs2.concurrent.Signal
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
 import fs2.Stream
@@ -37,7 +38,7 @@ import cats.effect.std.Supervisor
   * @param liveRef whether live button is toggled
   */
 class EventComponent(
-  stream: Stream[IO, Event],
+  signal: Signal[IO, Stream[IO, Event]],
   eventRef: Ref[IO, Option[EventDetails]],
   startTime: SignallingRef[IO, LocalDateTime],
   endTime: SignallingRef[IO, LocalDateTime],
@@ -60,8 +61,20 @@ class EventComponent(
       canvas      =  canvasIO.asInstanceOf[HTMLCanvasElement]
       context     =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
       eParser     <- Resource.eval(EventParser())
-      _           <- Resource.eval(sup.supervise(stream.evalTap(event =>
-                      eParser.parse(event).handleErrorWith(IO.println)).compile.drain).void)
+      parserRef   <- Resource.eval(Ref[IO].of(eParser))
+      _           <- Resource.eval(sup.supervise(signal.discrete.switchMap { stream => 
+                      // making a new parser
+                      val newParser = for {
+                        parser <- EventParser()
+                        _      <- parserRef.set(parser)
+                      } yield parser
+                      
+                      Stream.eval(newParser).flatMap { parser =>
+                        stream.evalTap(
+                          parser.parse(_).handleErrorWith(IO.println)
+                        )
+                      }
+                    }.compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
       isLive      <- Resource.eval(Ref[IO].of(true))
       rectRef     <- Resource.eval(Ref[IO].of(List[Rectangle]()))
@@ -71,7 +84,7 @@ class EventComponent(
       _           <- animate(canvas, 
                       context, 
                       sizer.asInstanceOf[HTMLElement],
-                      eParser,
+                      parserRef,
                       scrollRef, 
                       isLive, 
                       rectRef,
@@ -212,7 +225,7 @@ class EventComponent(
     canvas: HTMLCanvasElement,
     context: dom.CanvasRenderingContext2D,
     sizer: HTMLElement,
-    parser: EventParser,
+    parserRef: Ref[IO, EventParser],
     prevScrollPos: Ref[IO, Double],
     isLive: Ref[IO, Boolean],
     rectRef: Ref[IO, List[Rectangle]],
@@ -232,6 +245,7 @@ class EventComponent(
           liveTog   <- liveRef.get
           prevZoom  <- prevZoomRef.get
           zoomLev   <- zoomRef.get
+          parser  <- parserRef.get
 
           //*** liveTog will currently always be true 
 

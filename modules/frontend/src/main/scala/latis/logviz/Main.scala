@@ -7,12 +7,14 @@ import calico.IOWebApp
 import calico.html.io.{*, given}
 import cats.effect.IO
 import cats.effect.Resource
+import fs2.Stream
 import cats.effect.kernel.Ref
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
 import org.http4s.dom.FetchClientBuilder
 import org.http4s.client.Client
 
+import latis.logviz.model.Event
 
 
 /**
@@ -33,6 +35,8 @@ object Main extends IOWebApp {
       eventRef    <- Resource.eval(SignallingRef[IO].of[Option[EventDetails]](None))
       now         <- Resource.eval(IO(LocalDateTime.now(ZoneOffset.UTC)))
       startRef    <- Resource.eval(SignallingRef[IO].of(now.minusHours(24)))
+      events      <- Resource.eval(SignallingRef[IO].of[Stream[IO, Event]](ec.getEvents))
+
       //***
       endRef      <- Resource.eval(SignallingRef[IO].of(now))
       liveRef     <- Resource.eval(SignallingRef[IO].of(true))
@@ -51,11 +55,20 @@ object Main extends IOWebApp {
                         } yield ()
                       })
                     )
+      changeSource <- button(
+                        `type` := "button",
+                        "Reload Source",
+                        onClick(_ =>
+                          for {
+                            _ <- events.set(ec.getEvents)
+                          } yield ()
+                        )
+                      )
       //***
       //TODO: use later once able to make event request everytime time range changes
       //changes that are currently unused due to waiting on eventComponent rework will be marked with ***
       timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
-      // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange)
+      // timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange, changeSource)
       //***
 
       //zoom ref might not need to be a signallingref since we're checking every animation frame
@@ -64,7 +77,7 @@ object Main extends IOWebApp {
 
       evComponent =  new EventDetailComponent(eventRef)
       info        <- evComponent.render
-      component   =  new EventComponent(ec.getEvents, eventRef, startRef, endRef, liveRef, zoomRef)
+      component   =  new EventComponent(events, eventRef, startRef, endRef, liveRef, zoomRef)
       timeline    <- component.render
 
       requestInfo <- div(idAttr:= "request-detail", info)
