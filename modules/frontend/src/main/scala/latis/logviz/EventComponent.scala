@@ -73,8 +73,6 @@ class EventComponent(
                         stream.evalTap(parser.parse)
                       }
                     }.compile.drain).void)
-      _           <- Resource.eval(sup.supervise(stream.evalTap(event =>
-                      eParser.parse(event).handleErrorWith(IO.println)).compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
       isLive      <- Resource.eval(Ref[IO].of(true))
       rectRef     <- Resource.eval(Ref[IO].of(List[Rectangle]()))

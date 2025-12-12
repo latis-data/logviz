@@ -77,7 +77,7 @@ object Main extends IOWebApp {
 
       evComponent =  new EventDetailComponent(eventRef)
       info        <- evComponent.render
-      component   =  new EventComponent(ec.getEvents, eventRef, startRef, endRef, liveRef, zoomRef)
+      component   =  new EventComponent(events, eventRef, startRef, endRef, liveRef, zoomRef)
       timeline    <- component.render
 
       requestInfo <- div(idAttr:= "request-detail", info)
