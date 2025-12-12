@@ -70,7 +70,9 @@ class EventComponent(
                       } yield parser
                       
                       Stream.eval(newParser).flatMap { parser =>
-                        stream.evalTap(parser.parse)
+                        stream.evalTap(
+                          parser.parse(_).handleErrorWith(IO.println)
+                        )
                       }
                     }.compile.drain).void)
       scrollRef   <- Resource.eval(Ref[IO].of(0.0))
