@@ -224,6 +224,12 @@ object SplunkClient {
             }.flatMap(makeStream) // Step 5: Make a stream of logs and get a stream of events
           }
 
+          /**
+            * Queries Splunk to retrieve latis- and latis3- sources, ordering them based on most recent event from that source
+            *
+            * @param start the start time used to filter for events
+            * @param end the end time used to filter for events
+            */
           def enumerateSource(start: LocalDateTime, end: LocalDateTime): IO[List[List[String]]] = { // matching the start and end time of the actual query for enumeration?
             val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
             val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
@@ -242,7 +248,6 @@ object SplunkClient {
               val decodedResult = json.hcursor.downField("results").as[List[Map[String, String]]]
               decodedResult match {
                 case Right(listMap) =>
-                  // making a list of tuples instead of map
                   listMap.map{_.values.toList}
                 case Left(err) =>
                   throw new Exception("Source enumeration was unable to be parsed from JSON")
