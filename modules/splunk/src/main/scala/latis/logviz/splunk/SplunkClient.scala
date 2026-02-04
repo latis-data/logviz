@@ -18,6 +18,7 @@ import latis.logviz.model.Event
 /** Describes a client to be used for getting events from Splunk */
 trait SplunkClient {
   def query(start: LocalDateTime, end: LocalDateTime, source: String, index: String): Stream[IO, Event]
+  def enumerateSource(start: LocalDateTime, end: LocalDateTime): IO[List[List[String]]]
 }
 
 object SplunkClient {
@@ -136,10 +137,10 @@ object SplunkClient {
             * @param total the total amount of results Splunk returned
             * @return the results returned from Splunk in JSON format
             */
-          private def getResults(sessionkey: String, sid: String, total: Int): IO[Json] = {
+          private def getResults(sessionkey: String, sid: String, total: Int, endpath: String = "events"): IO[Json] = {
             val request = Request[IO](
               method = Method.GET,
-              uri = (splunkuri / "services" / "search" / "jobs" / sid / "events") // use /results if we want transformed events (performing stats or operations on events)
+              uri = (splunkuri / "services" / "search" / "jobs" / sid / endpath) // use /results if we want transformed events (performing stats or operations on events)
                 .withQueryParam("output_mode", "json")
                 .withQueryParam("offset", "0") // index of the first result to return
                 .withQueryParam("count", s"$total") // maximum number of results to return
@@ -221,6 +222,32 @@ object SplunkClient {
                 res        <- getResults(sessionkey, sid, total) // Step 4: Get the results from the query
               } yield res
             }.flatMap(makeStream) // Step 5: Make a stream of logs and get a stream of events
+          }
+
+          def enumerateSource(start: LocalDateTime, end: LocalDateTime): IO[List[List[String]]] = { // matching the start and end time of the actual query for enumeration?
+            val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
+            val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
+
+            // right now I am filtering based on latest time but we could also filter based on the total amount of events?
+            val query = s"| tstats count AS total_events, max(_time) AS latest_event_time WHERE index=* earliest_time=$eTime latest_time=$lTime BY source | convert ctime(latest_event_time) | search source=latis* | sort -latest_event_time | fields source, latest_event_time"
+
+            (for {
+              sessionkey <- getSessionKey
+              sid        <- generateQuery(sessionkey, query)
+              _          <- waitLoop(sessionkey, sid)
+              total      <- getTotalResults(sessionkey, sid)
+              res        <- getResults(sessionkey, sid, total, "results")
+              _          <- IO.println("So far so good")
+            } yield res).map { json =>
+              val decodedResult = json.hcursor.downField("results").as[List[Map[String, String]]]
+              decodedResult match {
+                case Right(listMap) =>
+                  // making a list of tuples instead of map
+                  listMap.map{_.values.toList}
+                case Left(err) =>
+                  throw new Exception("Source enumeration was unable to be parsed from JSON")
+              }
+            }
           }
         }
       }
