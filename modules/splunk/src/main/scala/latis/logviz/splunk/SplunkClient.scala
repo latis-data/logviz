@@ -18,7 +18,7 @@ import latis.logviz.model.Event
 /** Describes a client to be used for getting events from Splunk */
 trait SplunkClient {
   def query(start: LocalDateTime, end: LocalDateTime, source: String, index: String): Stream[IO, Event]
-  def enumerateSource(start: LocalDateTime, end: LocalDateTime): IO[List[List[String]]]
+  def enumerateSources: IO[List[(String, Long)]]
 }
 
 object SplunkClient {
@@ -230,12 +230,9 @@ object SplunkClient {
             * @param start the start time used to filter for events
             * @param end the end time used to filter for events
             */
-          def enumerateSource(start: LocalDateTime, end: LocalDateTime): IO[List[List[String]]] = { // matching the start and end time of the actual query for enumeration?
-            val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
-            val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
-
-            // right now I am filtering based on latest time but we could also filter based on the total amount of events?
-            val query = s"| tstats count AS total_events, max(_time) AS latest_event_time WHERE index=* earliest_time=$eTime latest_time=$lTime BY source | convert ctime(latest_event_time) | search source=latis* | sort -latest_event_time | fields source, latest_event_time"
+          def enumerateSources: IO[List[(String, Long)]] = {
+            // filtering based on latest time but we could also filter based on the total amount of events?
+            val query = s"| tstats max(_time) AS latest WHERE source=latis* AND (index=latis OR index=dev) by source | sort -latest"
 
             (for {
               sessionkey <- getSessionKey
@@ -243,14 +240,18 @@ object SplunkClient {
               _          <- waitLoop(sessionkey, sid)
               total      <- getTotalResults(sessionkey, sid)
               res        <- getResults(sessionkey, sid, total, "results")
-              _          <- IO.println("So far so good")
-            } yield res).map { json =>
+            } yield res).flatMap { json =>
               val decodedResult = json.hcursor.downField("results").as[List[Map[String, String]]]
               decodedResult match {
-                case Right(listMap) =>
-                  listMap.map{_.values.toList}
+                case Right(l) =>
+                  IO.pure(l.map { m =>
+                    val seq: Seq[String] = m.values.toSeq
+                    seq match {
+                      case Seq(a, b) => (a, b.toLong)
+                    }
+                  })
                 case Left(err) =>
-                  throw new Exception("Source enumeration was unable to be parsed from JSON")
+                  IO.raiseError(new Exception("Source enumeration was unable to be parsed from JSON"))
               }
             }
           }
