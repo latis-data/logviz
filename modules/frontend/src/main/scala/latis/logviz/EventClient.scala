@@ -57,22 +57,19 @@ object EventClient {
           
           val uri = endTime match {
             case None => 
-              //should there be a live query parameter?
-              // println("no end time. LIVE!!")
+              //TODO:
+              //using current time as the endtime if none is given
+              //should a live query parameter be added?
+              //how would real sources like splunk know to give realtime data?
               val endTime = LocalDateTime.now(java.time.ZoneId.of("UTC"))
               val end = endTime.toString()
               Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$end")
             
             case Some(value) => 
-              // println(s"end time given! $value")
-              //for some reason it seems like we're not making a new http request when I change the end date? 
-              //changing from live to not live also doesnt seem to make a new http request, or at 
               Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$value")
           }
 
           val request = Request[IO](method = Method.GET, uri = uri)
-          // println(uri)
-          // val request = Request[IO](method = Method.GET, uri = baseUri / "events")
           
           http.stream(request).flatMap{ res =>
             res.body

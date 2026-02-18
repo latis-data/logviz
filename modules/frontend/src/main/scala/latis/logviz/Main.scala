@@ -55,8 +55,6 @@ object Main extends IOWebApp {
                           end     <- if (!live) {
                                       //going from live to not live: visually it'll look like the canvas stopped moving
                                       //so endtime should just be where we left off
-                                      // endRef.set(LocalDateTime.now(ZoneOffset.UTC))
-
                                       endRef.updateAndGet(t => LocalDateTime.now(ZoneOffset.UTC))
                                       
                                     } else {
@@ -66,7 +64,6 @@ object Main extends IOWebApp {
                           start <- startRef.get
 
                           _     <- if (live) {
-                                      //if live, then I would just call with start time. 
                                       events.set(ec.getEvents(start.toString()))
                                     } else {
                                       //updating endRef already calls getevents correctly, so I dont think I need it again
@@ -86,28 +83,15 @@ object Main extends IOWebApp {
                           } yield ()
                         )
                       )
-
-      timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
-      timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange)  
-
-      zoomRef     <- Resource.eval(Ref[IO].of(1.0))
-      zoom        <- new ZoomComponent(zoomRef).render
-
-      evComponent =  new EventDetailComponent(eventRef)
-      info        <- evComponent.render
-      component   =  new EventComponent(events, eventRef, startRef, endRef, liveRef, zoomRef)
-      timeline    <- component.render
-
-      //changes made to the start and end times trigger new stream of events
+      
+      //changes made to the start and end times should trigger new stream of events
       sup         <- Supervisor[IO](await=true)
       _           <- Resource.eval(sup.supervise(endRef.discrete.evalMap{end => 
-                        for {
-                          //if an end time if given, then no longer expecting live stream of events
-                          _     <- liveRef.set(false)
-                          start <- startRef.get
-
-                        } yield(events.set(ec.getEvents(start.toString(), end.toString())))
-                      }.compile.drain).void)
+                      //if an end time if given, then no longer expecting live stream of events
+                      liveRef.set(false) >> startRef.get.flatMap { start =>
+                        events.set(ec.getEvents(start.toString(), end.toString()))
+                      }
+                    }.compile.drain).void)
 
       _           <- Resource.eval(sup.supervise(startRef.discrete.evalMap{t => 
                         for {
@@ -122,6 +106,17 @@ object Main extends IOWebApp {
 
                         } yield()
                       }.compile.drain).void)
+
+      timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
+      timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange)  
+
+      zoomRef     <- Resource.eval(Ref[IO].of(1.0))
+      zoom        <- new ZoomComponent(zoomRef).render
+
+      evComponent =  new EventDetailComponent(eventRef)
+      info        <- evComponent.render
+      component   =  new EventComponent(events, eventRef, startRef, endRef, liveRef, zoomRef)
+      timeline    <- component.render
 
       requestInfo <- div(idAttr:= "request-detail", info)
       box         <- div(idAttr:= "box", timeline, zoom, requestInfo, timeSelect)

@@ -1,6 +1,18 @@
 [
     {
         "eventType": "Request",
+        "id": "13",
+        "time": "-200000000",
+        "request": "failure test case from the past!"
+    },
+    {
+        "eventType": "Response",
+        "id": "13",
+        "time": "-199999999",
+        "status": 202
+    },
+    {
+        "eventType": "Request",
         "id": "11",
         "time": "-60900000",
         "request": "test case from the past"

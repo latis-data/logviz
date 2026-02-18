@@ -59,7 +59,7 @@ class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
         }
       )
     
-    //unused right now
+    //TODO: unused as of right now
     //default (past 24 hours)
     case req @ GET -> Root / "events" =>
       // hard coding times for now
