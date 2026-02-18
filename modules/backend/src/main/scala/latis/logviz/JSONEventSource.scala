@@ -56,6 +56,10 @@ class JSONEventSource extends EventSource {
           //makes it easier for distinguishing future and past events
           //if offset was off start time, then negative offset events would never get drawn 
           //and harder to partition positive offset events into past and future
+
+          //not sure whether to calculate future events based on end time or curr time
+          //in real practice, if this was "real" data, then future events should probably based on current time to actually be future events
+          //
           val curr = LocalDateTime.now(ZoneOffset.UTC)
           Stream.eval(Queue.unbounded[IO, Option[Event]]).flatMap{ queue => 
               Stream.eval(past.traverse{e => 
@@ -65,6 +69,7 @@ class JSONEventSource extends EventSource {
                   if (time.isBefore(start)) {
                     IO.unit
                   } else {
+                    //TODO: if we don't want a live stream, then we should toss out future events outside of end time
                     queue.offer(Some(event))
                   }
                 }) >>

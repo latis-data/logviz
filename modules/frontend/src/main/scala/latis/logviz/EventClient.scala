@@ -12,10 +12,24 @@ import org.http4s.Uri
 import org.http4s.client.Client
 
 import latis.logviz.model.Event
+import java.time.LocalDateTime
 
 /** EventClient used to return stream of events */
 trait EventClient {
-  def getEvents: Stream[IO, Event]
+  def getEvents(startTime: String, endTime: Option[String]): Stream[IO, Event]
+
+  //no given start and end time: past 24 hours + live
+  def getEvents: Stream[IO, Event] =
+    val curr = LocalDateTime.now(java.time.ZoneId.of("UTC"))
+    val start = curr.toLocalDate().atStartOfDay().toString()
+    getEvents(start, None)
+
+  //no end time (live)
+  def getEvents(start: String): Stream[IO, Event] = 
+    getEvents(start, None)
+
+  def getEvents(start: String, end: String): Stream[IO, Event] = 
+    getEvents(start, Some(end))
 }
 
 object EventClient {
@@ -39,8 +53,23 @@ object EventClient {
       val baseUri = Uri.unsafeFromString(s"$protocol//$host")
 
       new EventClient {
-        override def getEvents: Stream[IO, Event] =
-          val request = Request[IO](method = Method.GET, uri = baseUri / "events")
+        override def getEvents(startTime: String, endTime: Option[String]): Stream[IO, Event] =         
+          
+          val uri = endTime match {
+            case None => 
+              //TODO:
+              //using current time as the endtime if none is given
+              //should a live query parameter be added?
+              //how would real sources like splunk know to give realtime data?
+              val endTime = LocalDateTime.now(java.time.ZoneId.of("UTC"))
+              val end = endTime.toString()
+              Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$end")
+            
+            case Some(value) => 
+              Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$value")
+          }
+
+          val request = Request[IO](method = Method.GET, uri = uri)
           
           http.stream(request).flatMap{ res =>
             res.body

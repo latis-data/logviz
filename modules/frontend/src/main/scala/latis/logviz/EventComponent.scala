@@ -54,43 +54,44 @@ class EventComponent(
   def render: Resource[IO, HtmlElement[IO]] = 
     
     for {
-      sup         <- Supervisor[IO](await=true)
-      canvasIO    <- canvasTag(idAttr:= "canvas")
-      sizer       <- div(idAttr:= "sizer")
-      timeline    <- div(idAttr:= "timeline", canvasIO, sizer)
-      canvas      =  canvasIO.asInstanceOf[HTMLCanvasElement]
-      context     =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
-      eParser     <- Resource.eval(EventParser())
-      parserRef   <- Resource.eval(Ref[IO].of(eParser))
-      _           <- Resource.eval(sup.supervise(signal.discrete.switchMap { stream => 
-                      // making a new parser
-                      val newParser = for {
-                        parser <- EventParser()
-                        _      <- parserRef.set(parser)
-                      } yield parser
-                      
-                      Stream.eval(newParser).flatMap { parser =>
-                        stream.evalTap(
-                          parser.parse(_).handleErrorWith(IO.println)
-                        )
-                      }
-                    }.compile.drain).void)
-      scrollRef   <- Resource.eval(Ref[IO].of(0.0))
-      isLive      <- Resource.eval(Ref[IO].of(true))
-      rectRef     <- Resource.eval(Ref[IO].of(List[Rectangle]()))
-      end         <- Resource.eval(endTime.get)
-      prevEndRef  <- Resource.eval(Ref[IO].of(end))
-      prevZoomRef <- Resource.eval(Ref[IO].of(1.0))
-      _           <- animate(canvas, 
-                      context, 
-                      sizer.asInstanceOf[HTMLElement],
-                      parserRef,
-                      scrollRef, 
-                      isLive, 
-                      rectRef,
-                      prevEndRef,
-                      prevZoomRef)
-      _           <- hover(canvas, eventRef, rectRef)
+      sup           <- Supervisor[IO](await=true)
+      canvasIO      <- canvasTag(idAttr:= "canvas")
+      sizer         <- div(idAttr:= "sizer")
+      timeline      <- div(idAttr:= "timeline", canvasIO, sizer)
+      canvas        =  canvasIO.asInstanceOf[HTMLCanvasElement]
+      context       =  canvas.getContext("2d").asInstanceOf[dom.CanvasRenderingContext2D]
+      eParser       <- Resource.eval(EventParser())
+      parserRef     <- Resource.eval(Ref[IO].of(eParser))
+      parserUpdated <- Resource.eval(Ref[IO].of(false))
+        _           <- Resource.eval(sup.supervise(signal.discrete.switchMap { stream => 
+                        // making a new parser
+                        val newParser = for {
+                          parser <- EventParser()
+                          _      <- parserRef.set(parser)
+                        } yield parser
+                        
+                        Stream.eval(newParser).flatMap { parser =>
+                          stream.evalTap(
+                            parser.parse(_).handleErrorWith(IO.println) >> parserUpdated.set(true)
+                          )
+                        } 
+                      }.compile.drain).void)
+      scrollRef     <- Resource.eval(Ref[IO].of(0.0))
+      isTop         <- Resource.eval(Ref[IO].of(true))
+      rectRef       <- Resource.eval(Ref[IO].of(List[Rectangle]()))
+      end           <- Resource.eval(endTime.get)
+      //prevEndRef    <- Resource.eval(Ref[IO].of(end))
+      prevZoomRef   <- Resource.eval(Ref[IO].of(1.0))
+        _           <- animate(canvas, 
+                        context, 
+                        sizer.asInstanceOf[HTMLElement],
+                        parserRef,
+                        scrollRef, 
+                        isTop, 
+                        rectRef,
+                        prevZoomRef,
+                        parserUpdated)
+      _             <- hover(canvas, eventRef, rectRef)
     } yield(timeline)
   
   /**
@@ -219,7 +220,8 @@ class EventComponent(
    * @param prevScrollPos ref holding the previous scroll position
    * @param isLive ref determining whether to update live or not
    * @param rectRef ref to hold list of rectangles to be drawn
-   * @param prevEndRef ref to hold previous end time. used to determine if need to redraw
+   * @param prevZoomRef ref to hold previous zoom level
+   * @param parserUpdated ref determining whether there has been a new event parsed
   */
   private def animate(
     canvas: HTMLCanvasElement,
@@ -227,34 +229,32 @@ class EventComponent(
     sizer: HTMLElement,
     parserRef: Ref[IO, EventParser],
     prevScrollPos: Ref[IO, Double],
-    isLive: Ref[IO, Boolean],
+    isTop: Ref[IO, Boolean],
     rectRef: Ref[IO, List[Rectangle]],
-    prevEndRef: Ref[IO, LocalDateTime],
-    prevZoomRef: Ref[IO, Double]
+    prevZoomRef: Ref[IO, Double],
+    parserUpdated: Ref[IO, Boolean]
   ): Resource[IO, Dispatcher[IO]] =
     Dispatcher.sequential[IO] evalTap{ dispatcher => 
 
       def go(timestamp: Double): IO[Unit] = 
         for {
-          top       <- IO(canvas.parentElement.scrollTop)
-          live      <- isLive.get
-          prevTop   <- prevScrollPos.get
-          start     <- startTime.get
-          prevEnd   <- prevEndRef.get
-          end       <- endTime.get
-          liveTog   <- liveRef.get
-          prevZoom  <- prevZoomRef.get
-          zoomLev   <- zoomRef.get
-          parser  <- parserRef.get
+          scroll      <- IO(canvas.parentElement.scrollTop)
+          top         <- isTop.get
+          prevScroll  <- prevScrollPos.get
+          start       <- startTime.get
+          //prevEnd     <- prevEndRef.get
+          end         <- endTime.get
+          live        <- liveRef.get
+          prevZoom    <- prevZoomRef.get
+          zoomLev     <- zoomRef.get
+          parser      <- parserRef.get
+          newParser   <- parserUpdated.get
 
-          //*** liveTog will currently always be true 
-
-          //reason why live button is important here is 
-          //because we don't want resume live at top of canvas functionality when we set end date range in the past
-          //so live button tells us to allow live updating when at the top hence need for both liveTog and live
-
-          //if liveTog(want live updates when at the top) and if live(meaning we're at top of the canvas) then we always redraw each animation frame
-          _       <- if (liveTog && (live || prevTop != top || prevZoom != zoomLev)) {
+          //if live, then possible scenarios: 
+          //  - at top of canvas so continuously redrawing each animation frame
+          //  - draw when scroll or zoom
+          //  - changing start date -> new stream of events -> redraw
+          _       <- if (live && (top || prevScroll != scroll || prevZoom != zoomLev || newParser)) {
 
                       for {
                         //if user changes size of browser or anything, then just adjusting canvas to fit those changes
@@ -267,14 +267,17 @@ class EventComponent(
                         //subtracting by 150 to make room for timestamps to be drawn. So the total width available to event/column drawing is 150 pixels less
                         width   <- IO(canvas.width - 150) 
 
-                        //grabbing the current time to be used as endtime/top of canvas
+                        //grabbing the current time to be used as endtime/top of canvas (since live)
                         endTime <- IO(LocalDateTime.now(ZoneOffset.UTC))
+
                         //updating sizer height used for how much you can scroll
                         _       <- IO(sizer.style.height = s"${convertTime(start, endTime, zoomLev)-height}px")
+
+                        //if zoom level has changed, then need to compute the new scroll position so that user's view is around the same event
                         newTop  <- if (prevZoom != zoomLev) {
-                                    updateScrollTop(canvas, top, height/2, zoomLev/prevZoom)
+                                    updateScrollTop(canvas, scroll, height/2, zoomLev/prevZoom)
                                   } else {
-                                    IO(top)
+                                    IO(scroll)
                                   }
                         maxCol  <- parser.getMaxConcurrent()
                         events  <- parser.getEvents()
@@ -296,16 +299,18 @@ class EventComponent(
                                     zoomLev)
                         _       <- prevScrollPos.update(_ => newTop)
                         _       <- if (newTop == 0.0) {
-                                    isLive.update(_ => true)
+                                    isTop.update(_ => true)
                                   } else {
-                                    isLive.update(_ => false)
+                                    isTop.update(_ => false)
                                   }
                         _       <- prevZoomRef.set(zoomLev)
+                        _       <- parserUpdated.set(false)
                       } yield ()
 
-                      //*** unused until timecomponent is re-introduced
-                      //only redraw when scrolling or there are changes if live is not toggled
-                    } else if (!liveTog && (prevEnd != end || prevTop != top || prevZoom != zoomLev)){
+                      //only redraw when scrolled, zoomed, or new stream of events(changing start or end time)
+                      //don't think I need prevEnd anymore with the introduction of newParser
+                      //prevEnd != end || prevScroll != scroll || prevZoom != zoomLev
+                    } else if (!live && (prevScroll != scroll || prevZoom != zoomLev || newParser)){
                         for {
                           tlRect  <- IO(canvas.parentElement.getBoundingClientRect())
                           height  =  tlRect.height
@@ -314,9 +319,9 @@ class EventComponent(
                           width   <- IO(canvas.width - 150)
                           _       <- IO(sizer.style.height = s"${convertTime(start, end, zoomLev)-height}px")
                           newTop  <- if (prevZoom != zoomLev) {
-                                    updateScrollTop(canvas, top, height/2, zoomLev/prevZoom)
+                                    updateScrollTop(canvas, scroll, height/2, zoomLev/prevZoom)
                                   } else {
-                                    IO(top)
+                                    IO(scroll)
                                   }
                           maxCol  <- parser.getMaxConcurrent()
                           events  <- parser.getEvents()
@@ -337,8 +342,9 @@ class EventComponent(
                                       width,
                                       zoomLev)
                           _       <- prevScrollPos.update(_ => newTop)
-                          _       <- prevEndRef.set(end)
+                          //_       <- prevEndRef.set(end)
                           _       <- prevZoomRef.set(zoomLev)
+                          _       <- parserUpdated.set(false)
                         } yield()
                     } else {
                       IO.unit
