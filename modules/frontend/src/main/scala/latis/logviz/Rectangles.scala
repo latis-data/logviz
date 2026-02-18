@@ -32,6 +32,7 @@ object Rectangles{
     * @param width width of each rectangle
     * @param events 
     * @param startTime to be used for partial events
+    * @param pixelsPerSec 
     * @return list of rectangles
     */
   def makeRectangles(
@@ -114,10 +115,10 @@ object Rectangles{
               //scrolled to the point where we should see the partial event go into the past
               if (y-top <= height) {
                 Rectangle((RequestEvent.Partial(time, msg), cDepth),
-                startOffset + cDepth * width, height, width, y_end-y, "green") :: acc
+                startOffset + cDepth * width, height, width, y_end-y, "blue") :: acc
               } else {
                 Rectangle((RequestEvent.Partial(time, msg), cDepth),
-                startOffset + cDepth * width, y-top, width, y_end-y, "green") :: acc
+                startOffset + cDepth * width, y-top, width, y_end-y, "blue") :: acc
               }
             } else {
               acc

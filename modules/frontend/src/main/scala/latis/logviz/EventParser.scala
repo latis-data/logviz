@@ -96,8 +96,6 @@ object EventParser {
                             //No request event found, meaning that it was sometime outside of time range. 
                             //Thus, create a completed partial event since error status
                             case None =>
-                              //color to be adjusted
-
                               for {
                                 currDepth <- getUnusedColumn(pq).flatMap{
                                               case Some(value) => IO(value)

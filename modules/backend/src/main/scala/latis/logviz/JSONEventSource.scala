@@ -69,6 +69,7 @@ class JSONEventSource extends EventSource {
                   if (time.isBefore(start)) {
                     IO.unit
                   } else {
+                    //TODO: if we don't want a live stream, then we should toss out future events outside of end time
                     queue.offer(Some(event))
                   }
                 }) >>
