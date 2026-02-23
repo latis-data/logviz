@@ -6,6 +6,7 @@ import scala.concurrent.duration.*
 
 import cats.effect.IO
 import cats.effect.Resource
+import cats.syntax.all.*
 import fs2.Stream
 import io.circe.Json
 import org.http4s.*
@@ -226,9 +227,6 @@ object SplunkClient {
 
           /**
             * Queries Splunk to retrieve latis- and latis3- sources, ordering them based on most recent event from that source
-            *
-            * @param start the start time used to filter for events
-            * @param end the end time used to filter for events
             */
           def enumerateSources: IO[List[(String, Long)]] = {
             // filtering based on latest time but we could also filter based on the total amount of events?
@@ -244,12 +242,12 @@ object SplunkClient {
               val decodedResult = json.hcursor.downField("results").as[List[Map[String, String]]]
               decodedResult match {
                 case Right(l) =>
-                  IO.pure(l.map { m =>
-                    val seq: Seq[String] = m.values.toSeq
-                    seq match {
-                      case Seq(a, b) => (a, b.toLong)
-                    }
-                  })
+                  l.map { m =>
+                    (
+                      m.get("source"),
+                      m.get("latest").flatMap(_.toLongOption)
+                    ).tupled
+                  }.mapFilter(identity).pure
                 case Left(err) =>
                   IO.raiseError(new Exception("Source enumeration was unable to be parsed from JSON"))
               }
