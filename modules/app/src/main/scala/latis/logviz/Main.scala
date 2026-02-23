@@ -20,7 +20,7 @@ import latis.logviz.splunk.*
  * ShutdownTimeout of 5 seconds forcefully shuts down server in 5 seconds after stopping app
 */
 object Main extends IOApp.Simple {
-  val eventSource: Resource[IO, EventSource] = for {
+  val eventSource: Resource[IO, EventSource with InstanceSource] = for {
     splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]())
     source     <- splunkConf match {
       case SplunkConfig.Disabled => Resource.pure[IO, JSONEventSource](JSONEventSource())
