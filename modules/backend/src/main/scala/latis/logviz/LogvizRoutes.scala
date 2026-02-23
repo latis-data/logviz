@@ -6,6 +6,7 @@ import java.time.ZoneOffset
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.syntax.*
+import org.http4s.circe.*
 import org.http4s.EventStream
 import org.http4s.HttpRoutes
 import org.http4s.ServerSentEvent
@@ -25,7 +26,7 @@ import latis.logviz.model.Event
  * 
  * Get each file from the resources folder, else return notFound
 */
-class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
+class LogvizRoutes(eventsource: EventSource with InstanceSource) extends Http4sDsl[IO] {
   def routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ GET -> Root =>
       StaticFile.fromResource("index.html", req.some).getOrElseF(NotFound())
@@ -47,6 +48,13 @@ class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
       val sse: EventStream[IO] = events.map(eventToServerSent)
 
       Ok(sse)
+
+    case req @ GET -> Root / "instances" =>
+      val list = eventsource.instances.map { tup =>
+        tup.asJson
+      }
+
+      Ok(list)
   }
 
   private def eventToServerSent(event: Event): ServerSentEvent = {

@@ -23,7 +23,7 @@ val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm
 /**
   * Test event source. Pulling dummy data from a test JSON file
   */
-class JSONEventSource extends EventSource {
+class JSONEventSource extends EventSource with InstanceSource {
   override def getEvents(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] =
 
     val byteStream: Stream[IO, Byte] = readClassLoaderResource[IO]("events.json")
@@ -86,6 +86,10 @@ class JSONEventSource extends EventSource {
               }
             }
       }
+
+  override def instances: IO[List[(String, Long)]] = {
+    IO {List(("json", 0))}
+  }
 }
 
 private def getEventTime(event: Event): LocalDateTime = 
