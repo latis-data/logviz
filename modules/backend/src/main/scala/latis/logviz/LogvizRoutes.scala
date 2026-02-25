@@ -3,7 +3,6 @@ package latis.logviz
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
-import scala.util.Try
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.syntax.*
