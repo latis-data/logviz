@@ -45,19 +45,22 @@ class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
     // event with query params
     case req @ GET -> Root / "events" :? StartDateQueryParamMatcher(startTime) +& EndDateQueryParamMatcher(endTime) =>
 
-      startTime.fold(
-        _     => BadRequest("invalid start date"),
-        start => {
-          endTime.fold(
-            _   => BadRequest("invalid end date"),
-            end => {
-              val events = eventsource.getEvents(start, end)
-              val sse: EventStream[IO] = events.map(eventToServerSent)
-              Ok(sse)
-            }
-          )
-        }
+      val start = startTime.toEither.leftMap(
+        _ => BadRequest("invalid start date")
       )
+
+      val end = endTime.toEither.leftMap(
+        _  => BadRequest("invalid end date"),
+      )
+      
+      //only if both start and end are valid(Right)
+      //we end up with same type on Either[IO[Response[IO]], IO[Response[IO]]
+      //so we can then just merge to IO[Response[IO]]
+      (start, end).mapN { (start, end) => 
+        val events = eventsource.getEvents(start, end)
+        val sse: EventStream[IO] = events.map(eventToServerSent)
+        Ok(sse)
+      }.merge
     
     //TODO: unused as of right now
     //default (past 24 hours)
@@ -79,11 +82,9 @@ class LogvizRoutes(eventsource: EventSource) extends Http4sDsl[IO] {
   implicit val dateQueryParamDecoder: QueryParamDecoder[LocalDateTime] =
     //https://www.youtube.com/watch?v=v_gv6LsWdT0 36:20 Rock the JVM
     QueryParamDecoder[String].emap { dateString => 
-      Try(LocalDateTime.parse(dateString))
-        .toEither
-        .leftMap { e =>
-          ParseFailure(e.getMessage, e.getMessage)
-        }
+      Either.catchNonFatal(LocalDateTime.parse(dateString)).leftMap { e =>
+        ParseFailure(e.getMessage, e.getMessage)
+      }
     }
 
   object StartDateQueryParamMatcher extends ValidatingQueryParamDecoderMatcher[LocalDateTime]("startTime")
