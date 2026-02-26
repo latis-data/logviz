@@ -18,7 +18,7 @@ class SplunkEventSource(sclient: SplunkClient, source: String, index: String) ex
     sclient.query(start, end, source, index)
   }
 
-  override def instances: IO[List[(String, Long)]] = {
-    sclient.enumerateSources
+  override def instances: IO[List[String]] = {
+    sclient.enumerateSources.map(_.map(_._1))
   }
 }

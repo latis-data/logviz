@@ -26,7 +26,7 @@ import latis.logviz.model.Event
  * 
  * Get each file from the resources folder, else return notFound
 */
-class LogvizRoutes(eventsource: EventSource with InstanceSource) extends Http4sDsl[IO] {
+class LogvizRoutes(eventsource: EventSource, instancesource: InstanceSource) extends Http4sDsl[IO] {
   def routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ GET -> Root =>
       StaticFile.fromResource("index.html", req.some).getOrElseF(NotFound())
@@ -50,7 +50,7 @@ class LogvizRoutes(eventsource: EventSource with InstanceSource) extends Http4sD
       Ok(sse)
 
     case req @ GET -> Root / "instances" =>
-      val list = eventsource.instances.map { tup =>
+      val list = instancesource.instances.map { tup =>
         tup.asJson
       }
 

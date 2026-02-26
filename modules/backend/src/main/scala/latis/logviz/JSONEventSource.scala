@@ -87,8 +87,8 @@ class JSONEventSource extends EventSource with InstanceSource {
             }
       }
 
-  override def instances: IO[List[(String, Long)]] = {
-    IO {List(("json", 0))}
+  override def instances: IO[List[String]] = {
+    IO.pure(List("json"))
   }
 }
 

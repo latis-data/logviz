@@ -20,20 +20,20 @@ import latis.logviz.splunk.*
  * ShutdownTimeout of 5 seconds forcefully shuts down server in 5 seconds after stopping app
 */
 object Main extends IOApp.Simple {
-  val eventSource: Resource[IO, EventSource with InstanceSource] = for {
+  val eventSource: Resource[IO, (EventSource, InstanceSource)] = for {
     splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]())
     source     <- splunkConf match {
       case SplunkConfig.Disabled => Resource.pure[IO, JSONEventSource](JSONEventSource())
       case SplunkConfig.Enabled(uri, username, password, source, index) => SplunkClient.make(uri, username, password).map(client => SplunkEventSource(client, source, index))
     }
-  } yield source
+  } yield (source, source)
 
   override def run: IO[Unit] =
     eventSource.use { es =>
       EmberServerBuilder
         .default[IO]
         .withHost(ipv4"0.0.0.0")
-        .withHttpApp(LogvizRoutes(es).routes.orNotFound)
+        .withHttpApp(LogvizRoutes(es._1, es._2).routes.orNotFound)
         .withShutdownTimeout(5.seconds)
         .build
         .useForever
