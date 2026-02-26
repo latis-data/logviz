@@ -2,8 +2,8 @@ package latis.logviz
 
 import cats.effect.IO
 
-/** Describes an instance source that events come from */
+/** Describes an instance source that can enumerate LaTiS instances */
 trait InstanceSource {
-  /** Gets events from a given instance */
-  def instances: IO[List[(String, Long)]]
+  /** Enumerates LaTiS instances */
+  def instances: IO[List[String]]
 }
