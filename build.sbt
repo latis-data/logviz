@@ -57,9 +57,9 @@ lazy val backend = project
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
       "co.fs2" %% "fs2-core" % fs2Version,
-      "org.gnieh" %% "fs2-data-json" % "1.12.0",
-      "org.gnieh" %% "fs2-data-json-circe" % "1.12.0",
-      "org.gnieh" %% "fs2-data-text" % "1.12.0",
+      "org.gnieh" %% "fs2-data-json" % "1.12.1",
+      "org.gnieh" %% "fs2-data-json-circe" % "1.12.1",
+      "org.gnieh" %% "fs2-data-text" % "1.12.1",
       "org.http4s" %% "http4s-core" % http4sVersion,
       "org.http4s" %% "http4s-dsl" % http4sVersion,
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion
