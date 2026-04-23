@@ -1,10 +1,13 @@
 package latis.logviz
 
+import java.time.LocalDateTime
+
 import cats.effect.IO
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.dom.Window
 import io.circe.parser.*
+import org.http4s.circe.*
 import org.http4s.Method
 import org.http4s.Request
 import org.http4s.ServerSentEvent
@@ -12,24 +15,30 @@ import org.http4s.Uri
 import org.http4s.client.Client
 
 import latis.logviz.model.Event
-import java.time.LocalDateTime
 
 /** EventClient used to return stream of events */
 trait EventClient {
-  def getEvents(startTime: String, endTime: Option[String]): Stream[IO, Event]
+  def getEvents(startTime: String, endTime: Option[String], instance: Option[String]): Stream[IO, Event]
 
   //no given start and end time: past 24 hours + live
   def getEvents: Stream[IO, Event] =
     val curr = LocalDateTime.now(java.time.ZoneId.of("UTC"))
     val start = curr.toLocalDate().atStartOfDay().toString()
-    getEvents(start, None)
+    getEvents(start, None, None)
 
   //no end time (live)
-  def getEvents(start: String): Stream[IO, Event] = 
-    getEvents(start, None)
+  // def getEvents(start: String): Stream[IO, Event] = 
+  //   getEvents(start, None, Some("json1"))
 
-  def getEvents(start: String, end: String): Stream[IO, Event] = 
-    getEvents(start, Some(end))
+  // def getEvents(start: String, end: String): Stream[IO, Event] = 
+  //   getEvents(start, Some(end), Some("json1"))
+
+  def getEvents(start: String, end: String, instance: String): Stream[IO, Event] = 
+    getEvents(start, Some(end), Some(instance))
+
+
+
+  def getInstances: IO[List[String]]
 }
 
 object EventClient {
@@ -53,20 +62,17 @@ object EventClient {
       val baseUri = Uri.unsafeFromString(s"$protocol//$host")
 
       new EventClient {
-        override def getEvents(startTime: String, endTime: Option[String]): Stream[IO, Event] =         
-          
-          val uri = endTime match {
-            case None => 
-              //TODO:
-              //using current time as the endtime if none is given
-              //should a live query parameter be added?
-              //how would real sources like splunk know to give realtime data?
-              val endTime = LocalDateTime.now(java.time.ZoneId.of("UTC"))
-              val end = endTime.toString()
-              Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$end")
-            
+        override def getEvents(startTime: String, endTime: Option[String], instance: Option[String]): Stream[IO, Event] =         
+          val end = endTime match {
+            case Some(value) => value
+            case None => LocalDateTime.now(java.time.ZoneId.of("UTC")).toString()
+          }
+
+          val uri = instance match {
             case Some(value) => 
-              Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$value")
+              Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$end&instance=$value")
+            case None =>
+              Uri.unsafeFromString(s"$baseUri/events?startTime=$startTime&endTime=$end")
           }
 
           val request = Request[IO](method = Method.GET, uri = uri)
@@ -87,6 +93,13 @@ object EventClient {
               }
               .unNone
           }
+
+        override def getInstances: IO[List[String]] = {
+          val uri = Uri.unsafeFromString(s"$baseUri/instances")
+          val request = Request[IO](method = Method.GET, uri = uri)
+
+          http.expect(request)(jsonOf[IO, List[String]])
+        }
       }
     }
 }

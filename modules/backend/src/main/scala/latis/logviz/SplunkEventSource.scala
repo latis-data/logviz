@@ -14,7 +14,7 @@ import latis.logviz.splunk.*
  * @param sclient the SplunkClient used to access splunk
  */
 class SplunkEventSource(sclient: SplunkClient, source: String, index: String) extends EventSource with InstanceSource {
-  override def getEvents(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event] = {
+  override def getEvents(start: LocalDateTime, end: LocalDateTime, instance: Option[String]): Stream[IO, Event] = {
     sclient.query(start, end, source, index)
   }
 

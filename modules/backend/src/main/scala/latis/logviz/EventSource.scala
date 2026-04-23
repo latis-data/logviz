@@ -15,5 +15,5 @@ trait EventSource {
     * @param end the end time used to filter for events
     * @return a stream of events that have been parsed into Event objects
     */
-  def getEvents(start: LocalDateTime, end: LocalDateTime): Stream[IO, Event]
+  def getEvents(start: LocalDateTime, end: LocalDateTime, instance: Option[String]): Stream[IO, Event]
 }
