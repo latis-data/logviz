@@ -256,4 +256,211 @@ object SplunkClient {
         }
       }
   }
+
+  /** Creates a [[SplunkClient]] that uses Splunk's REST API
+    *
+    * @param splunkuri the uri of Splunk to be accessed
+    * @param token the token used for authentication
+    */
+  def make(splunkuri: Uri, token: String): Resource[IO, SplunkClient] = {
+    EmberClientBuilder
+      .default[IO]
+      .build
+      .map { client => 
+        new SplunkClient {
+          /** Queries Splunk given a search string
+            *
+            * @param query the Splunk search we want to run
+            * @return an SID that allows us to view the status of our search
+            */
+          private def generateQuery(query: String): IO[String] = {
+            val request = Request[IO](
+              method = Method.POST,
+              uri = splunkuri / "services" / "search" / "jobs"
+            ).putHeaders(
+              Header.Raw(CIString("Authorization"), s"Bearer $token")
+            ).withEntity(
+              UrlForm(
+                "search" -> query
+              )
+            )
+
+            client.expect[String](request).map{response =>
+              val sid: String = response.split("sid")(1).drop(1).dropRight(2)
+              sid
+            }
+          }
+
+          /** Checks if the search is done
+            *
+            * @param sid the search id generated when we created our search using generateQuery
+            * @return an integer specifying the status of the search
+            */
+          private def checkQuery(sid: String): IO[Int] = {
+            val request = Request[IO](
+              method = Method.GET,
+              uri = splunkuri / "services" / "search" / "jobs" / sid
+            ).putHeaders(
+              Header.Raw(CIString("Authorization"), s"Bearer $token")
+            )
+
+            client.expect[String](request).map{response =>
+              // dispatchState and isFailed may also be useful
+              val done: Int = response.split("isDone")(1).split("isEventsPreviewEnabled")(0).split("<")(0).drop(2).toInt
+              done
+            }
+          }
+
+          /** A loop that runs until the search is done
+            *
+            * @param sid the search id generated when we created our search using generateQuery
+            */
+          private def waitLoop(sid: String): IO[Unit] = {
+            for {
+              status <- checkQuery(sid)
+              _      <- if (status == 1) IO.unit
+                        else IO.sleep(2.seconds) *> waitLoop(sid)
+            } yield ()
+          }
+
+          /** Count the total amount of results Splunk returned
+            *
+            * @param sid the search id generated when we created our search using generateQuery
+            */
+          private def getTotalResults(sid: String): IO[Int] = {
+            val request = Request[IO](
+              method = Method.GET,
+              uri = splunkuri / "services" / "search" / "jobs" / sid
+            ).putHeaders(
+              Header.Raw(CIString("Authorization"), s"Bearer $token")
+            )
+
+            client.expect[String](request).map{response =>
+              val total: Int = response.split("resultCount")(1).split("resultIsStreaming")(0).split("<")(0).drop(2).toInt
+              total
+            }
+          }
+
+          /** Get the results from the Splunk search
+            *
+            * @param sid the search id generated when we created our search using generateQuery
+            * @param total the total amount of results Splunk returned
+            * @return the results returned from Splunk in JSON format
+            */
+          private def getResults(sid: String, total: Int, endpath: String = "events"): IO[Json] = {
+            val request = Request[IO](
+              method = Method.GET,
+              uri = (splunkuri / "services" / "search" / "jobs" / sid / endpath) // use /results if we want transformed events (performing stats or operations on events)
+                .withQueryParam("output_mode", "json")
+                .withQueryParam("offset", "0") // index of the first result to return
+                .withQueryParam("count", s"$total") // maximum number of results to return
+            ).putHeaders(
+              Header.Raw(CIString("Authorization"), s"Bearer $token")
+            ) 
+
+            client.expect[Json](request)
+          }
+
+          /** Make a stream from the responses from Splunk
+            *
+            * Parses the JSON into Event objects and creates a stream for continuous reading
+            * 
+            * @param response the JSON results from the Splunk search
+            * @return a stream of Event objects
+            */
+          private def makeStream(response: Json): Stream[IO, Event] = { 
+            // making a stream of messages
+            val decodedResult = response.hcursor.downField("results").as[List[SplunkMessage]]
+            val mStrm: Stream[IO, SplunkMessage] = decodedResult match {
+              case Right(messages) => 
+                Stream.emits(messages).covary[IO]
+              case Left(error) =>
+                Stream.raiseError(new Exception(s"Error parsing Json into Stream with error: $error"))
+            }
+
+            val getEvent: SplunkMessage => Option[Event] = (m: SplunkMessage) => {
+              val line: String = m.hcursor.downField("line").as[String].getOrElse("unknown")
+
+              // using contains method -- is there a better way to do this?
+              if line.contains("HTTP/1.1 GET") then
+                val spl = line.split("HTTP/1.1 GET")
+                val id = spl(0).split("request-id=")(1).dropRight(3)
+                val time = spl(0).split(" INFO")(0).drop(1)
+                val request = line.split("HTTP/1.1 GET")(1).drop(1)
+                Some(Event.Request(id, time, request))
+              else if line.contains("HTTP/1.1 ") then
+                val spl = line.split("HTTP/1.1 ")
+                val id = spl(0).split("request-id=")(1).dropRight(3)
+                val time = spl(0).split(" INFO")(0).drop(1)
+                val status = spl(1).split(" ")(0).toInt
+                Some(Event.Response(id, time, status))
+              else if line.contains("Elapsed ") then
+                val spl = line.split("Elapsed ")
+                val id = spl(0).split("request-id=")(1).dropRight(3)
+                val time = spl(0).split(" INFO")(0).drop(1)
+                val duration = spl(1).split("source")(0).drop(6).toInt
+                Some(Event.Success(id, time, duration))
+              else if line.contains("Ember-Server service bound to address:") then
+                val time = line.split(" INFO")(0).drop(1)
+                Some(Event.Start(time))
+              else
+                None
+            }
+
+            // stream of messages -> stream of events
+            val eStrm: Stream[IO, Event] = mStrm.map(getEvent).unNone
+            eStrm
+          }
+
+          /** Queries Splunk with a given search and returns the events as a stream of Event objects
+            *
+            * @param start the start time used to filter for events
+            * @param end the end time used to filter for events
+            */
+          def query(start: LocalDateTime, end: LocalDateTime, source: String, index: String): Stream[IO, Event] = {
+            // make the query from args
+            val eTime = start.toEpochSecond(ZoneOffset.UTC).toString()
+            val lTime = end.toEpochSecond(ZoneOffset.UTC).toString()
+            val query = s"search index=$index source=$source earliest_time=$eTime latest_time=$lTime | reverse"
+
+            Stream.eval {
+              for {
+                sid        <- generateQuery(query) // Step 1: Generate a query
+                _          <- waitLoop(sid) // Step 2: Check the status of a query
+                total      <- getTotalResults(sid)
+                res        <- getResults(sid, total) // Step 3: Get the results from the query
+              } yield res
+            }.flatMap(makeStream) // Step 4: Make a stream of logs and get a stream of events
+          }
+
+          /**
+            * Queries Splunk to retrieve latis- and latis3- sources, ordering them based on most recent event from that source
+            */
+          def enumerateSources: IO[List[(String, Long)]] = {
+            // filtering based on latest time but we could also filter based on the total amount of events?
+            val query = s"| tstats max(_time) AS latest WHERE source=latis* AND (index=latis OR index=dev) by source | sort -latest"
+
+            (for {
+              sid        <- generateQuery(query)
+              _          <- waitLoop(sid)
+              total      <- getTotalResults(sid)
+              res        <- getResults(sid, total, "results")
+            } yield res).flatMap { json =>
+              val decodedResult = json.hcursor.downField("results").as[List[Map[String, String]]]
+              decodedResult match {
+                case Right(l) =>
+                  l.map { m =>
+                    (
+                      m.get("source"),
+                      m.get("latest").flatMap(_.toLongOption)
+                    ).tupled
+                  }.mapFilter(identity).pure
+                case Left(err) =>
+                  IO.raiseError(new Exception("Source enumeration was unable to be parsed from JSON"))
+              }
+            }
+          }
+        }
+      }
+  }
 }

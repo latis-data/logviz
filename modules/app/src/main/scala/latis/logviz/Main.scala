@@ -24,7 +24,10 @@ object Main extends IOApp.Simple {
     splunkConf <- Resource.eval(ConfigSource.default.at("logviz.splunk").loadF[IO, SplunkConfig]())
     source     <- splunkConf match {
       case SplunkConfig.Disabled => Resource.pure[IO, JSONEventSource](JSONEventSource())
-      case SplunkConfig.Enabled(uri, username, password, source, index) => SplunkClient.make(uri, username, password).map(client => SplunkEventSource(client, source, index))
+      case SplunkConfig.Enabled(AuthType.UserPass(uri, username, password, source, index)) => 
+        SplunkClient.make(uri, username, password).map(client => SplunkEventSource(client, source, index))
+      case SplunkConfig.Enabled(AuthType.Token(uri, token, source, index)) =>
+        SplunkClient.make(uri, token).map(client => SplunkEventSource(client, source, index))
     }
   } yield (source, source)
 
