@@ -35,7 +35,6 @@ object SplunkConfig {
           c.atKey("auth").flatMap(_.asString) match {
             case Right(auth) => auth match {
               case "user-pass-auth" =>
-                println("User-pass")
                 (
                   c.atKey("uri").flatMap(ConfigReader[Uri].from),
                   c.atKey("username").flatMap(_.asString),
@@ -44,7 +43,6 @@ object SplunkConfig {
                   c.atKey("index").flatMap(_.asString)
                 ).mapN(AuthType.UserPass.apply).map(SplunkConfig.Enabled.apply)
               case "token-auth" =>
-                println("token")
                 (
                   c.atKey("uri").flatMap(ConfigReader[Uri].from),
                   c.atKey("token").flatMap(_.asString),
