@@ -3,6 +3,7 @@ package latis.logviz.splunk
 import cats.syntax.all.*
 import org.http4s.Uri
 import pureconfig.ConfigReader
+import pureconfig.error.*
 import pureconfig.module.http4s.*
 
 enum SplunkConfig {
@@ -42,6 +43,7 @@ object SplunkConfig {
                   ).mapN(AuthType.UserPass.apply)
                 case "token-auth" =>
                   (c.atKey("token").flatMap(_.asString)).map(AuthType.Token.apply)
+                case s: String => c.failed(CannotConvert(s, "AuthType", s"$s is not a valid auth type"))
               }
             }
           ).mapN(SplunkConfig.Enabled.apply)
