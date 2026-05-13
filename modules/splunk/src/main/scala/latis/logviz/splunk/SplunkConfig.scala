@@ -7,23 +7,20 @@ import pureconfig.module.http4s.*
 
 enum SplunkConfig {
   case Disabled
-  case Enabled(auth: AuthType)
+  case Enabled(
+    uri: Uri,
+    source: String,
+    index: String,
+    auth: AuthType
+  )
 }
 
 enum AuthType {
   case UserPass(
-    uri: Uri,
     username: String,
-    password: String,
-    source: String,
-    index: String
+    password: String
   )
-  case Token(
-    uri: Uri,
-    token: String,
-    source: String,
-    index: String
-  )
+  case Token(token: String)
 }
 
 object SplunkConfig {
@@ -32,27 +29,22 @@ object SplunkConfig {
       c.atKey("enabled").flatMap(_.asBoolean).flatMap {
         case false => SplunkConfig.Disabled.pure[ConfigReader.Result]
         case true =>
-          c.atKey("auth").flatMap(_.asString) match {
-            case Right(auth) => auth match {
-              case "user-pass-auth" =>
-                (
-                  c.atKey("uri").flatMap(ConfigReader[Uri].from),
-                  c.atKey("username").flatMap(_.asString),
-                  c.atKey("password").flatMap(_.asString),
-                  c.atKey("source").flatMap(_.asString),
-                  c.atKey("index").flatMap(_.asString)
-                ).mapN(AuthType.UserPass.apply).map(SplunkConfig.Enabled.apply)
-              case "token-auth" =>
-                (
-                  c.atKey("uri").flatMap(ConfigReader[Uri].from),
-                  c.atKey("token").flatMap(_.asString),
-                  c.atKey("source").flatMap(_.asString),
-                  c.atKey("index").flatMap(_.asString)
-                ).mapN(AuthType.Token.apply).map(SplunkConfig.Enabled.apply)
+          (
+            c.atKey("uri").flatMap(ConfigReader[Uri].from),
+            c.atKey("source").flatMap(_.asString),
+            c.atKey("index").flatMap(_.asString),
+            c.atKey("auth").flatMap(_.asString).flatMap { authString =>
+              authString.toLowerCase match {
+                case "user-pass-auth" =>
+                  (
+                    c.atKey("username").flatMap(_.asString),
+                    c.atKey("password").flatMap(_.asString)
+                  ).mapN(AuthType.UserPass.apply)
+                case "token-auth" =>
+                  (c.atKey("token").flatMap(_.asString)).map(AuthType.Token.apply)
+              }
             }
-            case Left(err) =>
-              throw new Exception(f"Unable to parse AuthType: $err")
-          }
+          ).mapN(SplunkConfig.Enabled.apply)
       }
     }
   }
