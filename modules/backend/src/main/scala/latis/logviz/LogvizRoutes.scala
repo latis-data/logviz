@@ -39,11 +39,17 @@ class LogvizRoutes(eventsource: EventSource, instancesource: InstanceSource) ext
     case req @ GET -> Root / "events.json" =>
       StaticFile.fromResource("events.json", req.some).getOrElseF(NotFound())
 
+    case req @ GET -> Root / "events1.json" =>
+      StaticFile.fromResource("events1.json", req.some).getOrElseF(NotFound())
+
     case req @ GET -> Root / "styles.css" =>
       StaticFile.fromResource("styles.css", req.some).getOrElseF(NotFound())
 
     // event with query params
-    case req @ GET -> Root / "events" :? StartDateQueryParamMatcher(startTime) +& EndDateQueryParamMatcher(endTime) =>
+    case req @ GET -> Root / "events" :? 
+    StartDateQueryParamMatcher(startTime) +&
+    EndDateQueryParamMatcher(endTime) +&
+    InstanceQueryParamMatcher(instance) =>
 
       val start = startTime.toEither.leftMap(
         _ => BadRequest("invalid start date")
@@ -57,18 +63,17 @@ class LogvizRoutes(eventsource: EventSource, instancesource: InstanceSource) ext
       //we end up with same type on Either[IO[Response[IO]], IO[Response[IO]]
       //so we can then just merge to IO[Response[IO]]
       (start, end).mapN { (start, end) => 
-        val events = eventsource.getEvents(start, end)
+        val events = eventsource.getEvents(start, end, instance)
         val sse: EventStream[IO] = events.map(eventToServerSent)
         Ok(sse)
       }.merge
     
-    //TODO: unused as of right now
     //default (past 24 hours)
     case req @ GET -> Root / "events" =>
       // hard coding times for now
       val end: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC)
       val start: LocalDateTime = end.minusHours(24)
-      val events = eventsource.getEvents(start, end)
+      val events = eventsource.getEvents(start, end, None)
       val sse: EventStream[IO] = events.map(eventToServerSent)
 
       Ok(sse)
@@ -96,5 +101,6 @@ class LogvizRoutes(eventsource: EventSource, instancesource: InstanceSource) ext
 
   object StartDateQueryParamMatcher extends ValidatingQueryParamDecoderMatcher[LocalDateTime]("startTime")
   object EndDateQueryParamMatcher extends ValidatingQueryParamDecoderMatcher[LocalDateTime]("endTime")
+  object InstanceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("instance")
   
 }

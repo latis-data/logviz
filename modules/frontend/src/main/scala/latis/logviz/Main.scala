@@ -7,9 +7,11 @@ import calico.IOWebApp
 import calico.html.io.{*, given}
 import cats.effect.IO
 import cats.effect.Resource
+import cats.syntax.all.*
 import fs2.Stream
 import cats.effect.kernel.Ref
 import fs2.concurrent.SignallingRef
+import fs2.concurrent.Signal
 import fs2.dom.HtmlElement
 import org.http4s.dom.FetchClientBuilder
 import org.http4s.client.Client
@@ -39,6 +41,7 @@ object Main extends IOWebApp {
       endRef      <- Resource.eval(SignallingRef[IO].of(now))
       liveRef     <- Resource.eval(SignallingRef[IO].of(false))
       events      <- Resource.eval(SignallingRef[IO].of[Stream[IO, Event]](ec.getEvents))
+      instanceRef <- Resource.eval(SignallingRef[IO].of[String](""))
 
       liveButton  <- button( 
                       `type` := "button",
@@ -49,27 +52,29 @@ object Main extends IOWebApp {
                       },
                       onClick(_ => {
                         for {
-                          //TODO "disabling" endtime when live so visually looks like its not being used?
+                          //TODO "disabling/greying out" endtime button when live so visually looks like its not being used?
                           live  <- liveRef.updateAndGet(bool => !bool)
 
-                          end     <- if (!live) {
+                          _     <- if (!live) {
                                       //going from live to not live: visually it'll look like the canvas stopped moving
                                       //so endtime should just be where we left off
-                                      endRef.updateAndGet(t => LocalDateTime.now(ZoneOffset.UTC))
+                                      endRef.update(t => LocalDateTime.now(ZoneOffset.UTC))
                                       
                                     } else {
                                       IO.unit
                                     }
 
-                          start <- startRef.get
+                          // start <- startRef.get
 
-                          _     <- if (live) {
-                                      events.set(ec.getEvents(start.toString()))
-                                    } else {
-                                      //updating endRef already calls getevents correctly, so I dont think I need it again
-                                      //events.set(ec.getEvents(start.toString(), end.toString()))
-                                      IO.unit
-                                    }
+                          //if I just have params take liveref, then changes to liveref should trigger a change right?
+                          // _     <- if (live) {
+                          //             startRef.set(start)
+                          //             // events.set(ec.getEvents(start.toString()))
+                          //           } else {
+                          //             //updating endRef already calls getevents correctly, so I dont think I need it again
+                          //             //events.set(ec.getEvents(start.toString(), end.toString()))
+                          //             IO.unit
+                          //           }
                           
                         } yield ()
                       })
@@ -84,28 +89,29 @@ object Main extends IOWebApp {
                         )
                       )
       
-      //changes made to the start and end times should trigger new stream of events
       sup         <- Supervisor[IO](await=true)
-      _           <- Resource.eval(sup.supervise(endRef.discrete.evalMap{end => 
-                      //if an end time if given, then no longer expecting live stream of events
-                      liveRef.set(false) >> startRef.get.flatMap { start =>
-                        events.set(ec.getEvents(start.toString(), end.toString()))
-                      }
-                    }.compile.drain).void)
 
-      _           <- Resource.eval(sup.supervise(startRef.discrete.evalMap{t => 
-                        for {
-                          live  <- liveRef.get
-                          start = t.toString
+      //probably don't need this anymore since we're combining signal in params
+      // _           <- Resource.eval(sup.supervise(endRef.discrete.evalMap{end => 
+      //                 //if an end time if given, then no longer expecting live stream of events
+      //                 liveRef.set(false) >> startRef.get.flatMap { start =>
+      //                   events.set(ec.getEvents(start.toString(), end.toString()))
+      //                 }
+      //               }.compile.drain).void)
 
-                          _     <- if (live) {
-                                    events.set(ec.getEvents(start))
-                                  } else {
-                                    endRef.get.flatMap(end => events.set(ec.getEvents(start, end.toString())))
-                                  }
+      // _           <- Resource.eval(sup.supervise(startRef.discrete.evalMap{t => 
+      //                   for {
+      //                     live  <- liveRef.get
+      //                     start = t.toString
 
-                        } yield()
-                      }.compile.drain).void)
+      //                     _     <- if (live) {
+      //                               events.set(ec.getEvents(start))
+      //                             } else {
+      //                               endRef.get.flatMap(end => events.set(ec.getEvents(start, end.toString())))
+      //                             }
+
+      //                   } yield()
+      //                 }.compile.drain).void)
 
       timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
       timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange)  
@@ -117,9 +123,24 @@ object Main extends IOWebApp {
       info        <- evComponent.render
       component   =  new EventComponent(events, eventRef, startRef, endRef, liveRef, zoomRef)
       timeline    <- component.render
+      
+      instances   <- Resource.eval(ec.getInstances)
+      autocomplete<- new AutocompleteComponent(instances, instanceRef).render
+
+      //any changes to any of these signallingrefs should trigger a getevents call
+      params      = (startRef.asInstanceOf[Signal[IO, LocalDateTime]], 
+                     endRef.asInstanceOf[Signal[IO, LocalDateTime]], 
+                     instanceRef.asInstanceOf[Signal[IO, String]],
+                     liveRef.asInstanceOf[Signal[IO, Boolean]]).mapN{
+                      (start, end, instance, live) => (start, end, instance)
+                    }
+
+      _           <- Resource.eval(sup.supervise(params.discrete.switchMap { (s, e, i) => 
+                        Stream.exec(events.set(ec.getEvents(s.toString(), e.toString(), i)))
+                  }.compile.drain).void)
 
       requestInfo <- div(idAttr:= "request-detail", info)
-      box         <- div(idAttr:= "box", timeline, zoom, requestInfo, timeSelect)
+      box         <- div(idAttr:= "box", timeline, zoom, requestInfo, timeSelect, autocomplete)
       html        <- div(idAttr:= "container", box)
       
   } yield html

@@ -24,7 +24,7 @@
         "status": 202
     },
     {
-        "eventType":"Success",
+        "eventType": "Success",
         "id": "11",
         "time": "-60830000",
         "duration": 70
@@ -44,7 +44,7 @@
     {
         "eventType": "Response",
         "id": "12",
-        "time":"-57304995",
+        "time": "-57304995",
         "status": 202
     },
     {
@@ -52,7 +52,6 @@
         "id": "12",
         "time": "-56700000",
         "duration": 605
-        
     },
     {
         "eventType": "Start",
@@ -95,53 +94,49 @@
         "msg": "overlapping test red!"
     },
     {
-       	"eventType": "Request",
-      	"id": "2",
-      	"time": "-51894000",
-	    "request": "bad request example"	
+        "eventType": "Request",
+        "id": "2",
+        "time": "-51894000",
+        "request": "bad request example"
     },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "2",
         "time": "-51893000",
         "status": 404
     },
-    { 
+    {
         "eventType": "Request",
         "id": "3",
         "time": "-26880000",
         "request": "example3"
-    
-    }, 
+    },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "3",
         "time": "-26879000",
         "status": 202
-    
     },
-    {	
+    {
         "eventType": "Request",
         "id": "4",
         "time": "-26877000",
         "request": "example4"
-    
-    }, 
+    },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "4",
         "time": "-26876000",
         "status": 202
-    
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "4",
         "time": "-26865000",
         "duration": 12
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "3",
         "time": "-26800000",
         "duration": 80
@@ -151,19 +146,17 @@
         "id": "5",
         "time": "-24600000",
         "request": "example5 fail case"
-    
-    }, 
+    },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "5",
         "time": "-24599000",
         "status": 202
-        
     },
     {
         "eventType": "Failure",
         "id": "5",
-        "time": "-24597000", 
+        "time": "-24597000",
         "msg": "something went wrong"
     },
     {
@@ -215,109 +208,109 @@
         "status": 202
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "6",
         "time": "-18238000",
         "duration": 121
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "7",
         "time": "-18234000",
         "duration": 126
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "8",
         "time": "-18183000",
         "duration": 117
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "9",
         "time": "-18178000",
         "duration": 108
     },
     {
-    	"eventType": "Request",
+        "eventType": "Request",
         "id": "10",
         "time": "-1786000",
         "request": "example10 ongoing case"
     },
     {
-    	"eventType": "Request",
+        "eventType": "Request",
         "id": "14",
         "time": "5674",
         "request": "example 11 future event"
     },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "14",
         "time": "5678",
         "status": 202
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "14",
         "time": "205674",
         "duration": 200
     },
     {
-    	"eventType": "Request",
+        "eventType": "Request",
         "id": "15",
         "time": "1200000",
         "request": "example 15 future failed event"
     },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "15",
         "time": "1202000",
         "status": 404
     },
     {
-    	"eventType": "Request",
+        "eventType": "Request",
         "id": "16",
         "time": "2700000",
         "request": "example 16 future concurrent event"
     },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "16",
         "time": "2701000",
         "status": 202
     },
     {
-    	"eventType": "Request",
+        "eventType": "Request",
         "id": "17",
         "time": "2720000",
         "request": "example 17 future failed concurrent event"
     },
     {
-    	"eventType": "Request",
+        "eventType": "Request",
         "id": "18",
         "time": "2720000",
         "request": "example 18 future concurrent event"
     },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "17",
         "time": "2721000",
         "status": 202
     },
     {
-    	"eventType": "Response",
+        "eventType": "Response",
         "id": "18",
         "time": "2721000",
         "status": 202
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "16",
         "time": "2880000",
         "duration": 180
     },
     {
-    	"eventType": "Success",
+        "eventType": "Success",
         "id": "18",
         "time": "2910000",
         "duration": 190
@@ -325,11 +318,7 @@
     {
         "eventType": "Failure",
         "id": "17",
-        "time": "2930000", 
+        "time": "2930000",
         "msg": "failed future event!"
     }
-
-
-
-
 ]
