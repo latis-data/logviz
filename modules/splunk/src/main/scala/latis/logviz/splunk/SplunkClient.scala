@@ -243,7 +243,7 @@ object SplunkClient {
             */
           def enumerateSources: IO[List[(String, Long)]] = {
             // filtering based on latest time but we could also filter based on the total amount of events?
-            val query = s"| tstats max(_time) AS latest WHERE source=latis* AND (index=latis OR index=dev) by source | sort -latest"
+            val query = s"| tstats max(_time) AS latest WHERE source=latis* AND index=latis by source | sort -latest"
 
             (for {
               authHeader <- makeAuthHeader

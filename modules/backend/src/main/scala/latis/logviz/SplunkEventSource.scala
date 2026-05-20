@@ -15,7 +15,10 @@ import latis.logviz.splunk.*
  */
 class SplunkEventSource(sclient: SplunkClient, source: String, index: String) extends EventSource with InstanceSource {
   override def getEvents(start: LocalDateTime, end: LocalDateTime, instance: Option[String]): Stream[IO, Event] = {
-    sclient.query(start, end, source, index)
+    instance match {
+      case Some("") | None => sclient.query(start, end, source, index)
+      case Some(inst)      => sclient.query(start, end, inst, index)
+    }
   }
 
   override def instances: IO[List[String]] = {
