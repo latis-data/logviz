@@ -7,7 +7,7 @@ val circeVersion = "0.14.15"
 val fs2Version = "3.13.0"
 val http4sVersion = "0.23.34"
 val log4catsVersion = "2.8.0"
-val logbackVersion = "1.5.33"
+val logbackVersion = "1.5.34"
 val pureconfigVersion = "0.17.10"
 
 val commonSettings = Seq(
