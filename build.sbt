@@ -17,54 +17,16 @@ val commonSettings = Seq(
   }
 )
 
-/**
- * Gets the `version` from the latter part of a <project>@<version> tag
- * plus decorations from git describe.
- */
-val gitSettings = Seq(
-  git.useGitDescribe := true,
-  git.gitDescribePatterns := Seq(s"${name.value}@*"),
-  git.gitTagToVersionNumber := { tag: String =>
-    tag.split("@") match {
-      case Array(_, v) => Some(v)
-      case _ => None
-    }
-  }
-)
-
-val buildInfoSettings = Seq(
-  buildInfoKeys := Seq[BuildInfoKey](
-    "service" -> name.value,
-    version,
-    BuildInfoKey.action("buildTime") {
-      java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.now())
-    }),
-  buildInfoPackage := "latis.util",
-  buildInfoOptions += BuildInfoOption.ToMap
-)
-
-val dockerCompile = taskKey[Unit](
-  "Compile the frontend for docker and copy to the backend resource directory"
-)
-
-ThisBuild / dockerCompile := {
-  val js = (frontend / Compile / fullLinkJSOutput).value
-  val dst = (backend / Compile / resourceDirectory).value
-  IO.copyFile(js / "main.js", dst / "main.js")
-}
-
 val dockerSettings = Seq(
   docker / imageNames := {
-    val registry = "latis-logviz"
-    val tag = if (isSnapshot.value) "dev" else version.value
     Seq(
-      ImageName(s"$registry/${name.value}:$tag"),
-      ImageName(s"$registry/${name.value}:latest")
+      ImageName("latis/logviz:dev"),
+      ImageName("latis/logviz:latest")
     )
   },
   docker / dockerfile := {
     val mainclass = "latis.logviz.Main"
-    val jsFile = (backend / Compile / resourceDirectory).value / "main.js"
+    val jsFile = (frontend / Compile / fullLinkJSOutput).value / "main.js"
 
     val jsFolder = "/app/js/"
     val depClasspath = (Runtime / managedClasspath).value
@@ -87,8 +49,7 @@ val dockerSettings = Seq(
   docker / buildOptions := BuildOptions(
     additionalArguments = Seq("--platform", "linux/amd64"),
     pullBaseImage = BuildOptions.Pull.Always
-  ),
-  docker := docker.dependsOn(ThisBuild / dockerCompile).value
+  )
 )
 
 lazy val root = project
@@ -106,12 +67,8 @@ lazy val app = project
   .in(file("modules/app"))
   .dependsOn(backend)
   .enablePlugins(DockerPlugin)
-  .enablePlugins(BuildInfoPlugin)
-  .enablePlugins(GitVersioning)
   .settings(commonSettings)
   .settings(dockerSettings)
-  .settings(buildInfoSettings)
-  .settings(gitSettings)
   .settings(
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % catsVersion,
