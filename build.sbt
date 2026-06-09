@@ -17,6 +17,41 @@ val commonSettings = Seq(
   }
 )
 
+val dockerSettings = Seq(
+  docker / imageNames := {
+    Seq(
+      ImageName("latis/logviz:dev"),
+      ImageName("latis/logviz:latest")
+    )
+  },
+  docker / dockerfile := {
+    val mainclass = "latis.logviz.Main"
+    val jsFile = (frontend / Compile / fullLinkJSOutput).value / "main.js"
+
+    val jsFolder = "/app/js/"
+    val depClasspath = (Runtime / managedClasspath).value
+    val intClasspath = (Runtime / internalDependencyAsJars).value
+    val cp = (depClasspath ++ intClasspath).files.map { x =>
+      s"/app/${x.getName}"
+    }.mkString(":")
+
+    val entryCommand = s"exec java $$JAVA_OPTS -cp $jsFolder:$cp $mainclass"
+
+    new Dockerfile {
+      from("eclipse-temurin:17-jre-alpine")
+      expose(8080)
+      entryPoint("/bin/sh", "-c", entryCommand)
+      copy(depClasspath.files, "/app/")
+      copy(intClasspath.files, "/app/")
+      copy(jsFile, "/app/js/main.js")
+    }
+  },
+  docker / buildOptions := BuildOptions(
+    additionalArguments = Seq("--platform", "linux/amd64"),
+    pullBaseImage = BuildOptions.Pull.Always
+  )
+)
+
 lazy val root = project
   .in(file("."))
   .aggregate(
@@ -31,7 +66,9 @@ lazy val root = project
 lazy val app = project
   .in(file("modules/app"))
   .dependsOn(backend)
+  .enablePlugins(DockerPlugin)
   .settings(commonSettings)
+  .settings(dockerSettings)
   .settings(
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % catsVersion,
