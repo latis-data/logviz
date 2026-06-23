@@ -197,7 +197,7 @@ object EventParser {
                             >> IO(currDepth)
                           case Some((RequestEvent.Partial(start, status), currDepth)) =>
                             compEventsRef.update(lst =>
-                              (RequestEvent.Partial(time, s"successful event with response status of: $status, error msg: $msg"), 
+                              (RequestEvent.Partial(time, s"failed event with response status of: $status, error msg: $msg"), 
                               currDepth) +: lst)
                             >> IO(currDepth)
                           case Some((_, currDepth)) => 
