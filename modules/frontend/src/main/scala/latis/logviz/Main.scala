@@ -40,7 +40,7 @@ object Main extends IOWebApp {
       startRef    <- Resource.eval(SignallingRef[IO].of(now.minusHours(24)))
       endRef      <- Resource.eval(SignallingRef[IO].of(now))
       liveRef     <- Resource.eval(SignallingRef[IO].of(false))
-      events      <- Resource.eval(SignallingRef[IO].of[Stream[IO, Event]](ec.getEvents))
+      events      <- Resource.eval(SignallingRef[IO].of[Stream[IO, Event]](Stream.empty))
       instanceRef <- Resource.eval(SignallingRef[IO].of[String](""))
 
       liveButton  <- button( 
@@ -91,6 +91,18 @@ object Main extends IOWebApp {
       
       sup         <- Supervisor[IO](await=true)
 
+      //any changes to any of these signallingrefs should trigger a getevents call
+      params      = (startRef.asInstanceOf[Signal[IO, LocalDateTime]], 
+                     endRef.asInstanceOf[Signal[IO, LocalDateTime]], 
+                     instanceRef.asInstanceOf[Signal[IO, String]],
+                     liveRef.asInstanceOf[Signal[IO, Boolean]]).mapN{
+                      (start, end, instance, live) => (start, end, instance)
+                    }
+
+      _           <- Resource.eval(sup.supervise(params.discrete.switchMap { (s, e, i) => 
+                        Stream.exec(events.set(ec.getEvents(s.toString(), e.toString(), i)))
+                  }.compile.drain).void)
+
       //probably don't need this anymore since we're combining signal in params
       // _           <- Resource.eval(sup.supervise(endRef.discrete.evalMap{end => 
       //                 //if an end time if given, then no longer expecting live stream of events
@@ -126,18 +138,6 @@ object Main extends IOWebApp {
       
       instances   <- Resource.eval(ec.getInstances)
       autocomplete<- new AutocompleteComponent(instances, instanceRef).render
-
-      //any changes to any of these signallingrefs should trigger a getevents call
-      params      = (startRef.asInstanceOf[Signal[IO, LocalDateTime]], 
-                     endRef.asInstanceOf[Signal[IO, LocalDateTime]], 
-                     instanceRef.asInstanceOf[Signal[IO, String]],
-                     liveRef.asInstanceOf[Signal[IO, Boolean]]).mapN{
-                      (start, end, instance, live) => (start, end, instance)
-                    }
-
-      _           <- Resource.eval(sup.supervise(params.discrete.switchMap { (s, e, i) => 
-                        Stream.exec(events.set(ec.getEvents(s.toString(), e.toString(), i)))
-                  }.compile.drain).void)
 
       requestInfo <- div(idAttr:= "request-detail", info)
       box         <- div(idAttr:= "box", timeline, zoom, requestInfo, timeSelect, autocomplete)
