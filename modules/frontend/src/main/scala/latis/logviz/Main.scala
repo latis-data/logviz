@@ -100,7 +100,6 @@ object Main extends IOWebApp {
                     }
 
       _           <- Resource.eval(sup.supervise(params.discrete.switchMap { (s, e, i) => 
-                        println("Change detected to signalling ref...")
                         Stream.exec(events.set(ec.getEvents(s.toString(), e.toString(), i)))
                   }.compile.drain).void)
 
