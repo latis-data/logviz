@@ -19,6 +19,7 @@ import cats.effect.kernel.Ref
 import fs2.concurrent.Signal
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
+import fs2.Pull
 import fs2.Stream
 
 import latis.logviz.model.Event
@@ -63,18 +64,28 @@ class EventComponent(
       eParser       <- Resource.eval(EventParser())
       parserRef     <- Resource.eval(Ref[IO].of(eParser))
       parserUpdated <- Resource.eval(Ref[IO].of(false))
-        _           <- Resource.eval(sup.supervise(signal.discrete.switchMap { stream => 
+        _           <- Resource.eval(sup.supervise(signal.discrete.drop(1).switchMap { eventStream => 
                         // making a new parser
                         val newParser = for {
                           parser <- EventParser()
                           _      <- parserRef.set(parser)
                         } yield parser
+
+                        val alert: Stream[IO, Event] = eventStream.pull.uncons1.flatMap {
+                          case Some((el, strm)) =>
+                            Pull.output1(el)
+                          case None => 
+                            dom.window.alert("No events returned from query.")
+                            Pull.done
+                        }.stream
                         
-                        Stream.eval(newParser).flatMap { parser =>
-                          stream.evalTap(
-                            parser.parse(_).handleErrorWith(IO.println) >> parserUpdated.set(true)
-                          )
-                        } 
+                        alert.flatMap { _ =>
+                          Stream.eval(newParser).flatMap { parser =>
+                            eventStream.evalTap(
+                              parser.parse(_).handleErrorWith(IO.println) >> parserUpdated.set(true)
+                            )
+                          } 
+                        }
                       }.compile.drain).void)
       scrollRef     <- Resource.eval(Ref[IO].of(0.0))
       isTop         <- Resource.eval(Ref[IO].of(true))
