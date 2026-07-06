@@ -19,7 +19,6 @@ import cats.effect.kernel.Ref
 import fs2.concurrent.Signal
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
-// import fs2.Pull
 import fs2.Stream
 
 import latis.logviz.model.Event
