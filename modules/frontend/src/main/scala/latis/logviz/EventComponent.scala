@@ -19,7 +19,7 @@ import cats.effect.kernel.Ref
 import fs2.concurrent.Signal
 import fs2.concurrent.SignallingRef
 import fs2.dom.HtmlElement
-import fs2.Pull
+// import fs2.Pull
 import fs2.Stream
 
 import latis.logviz.model.Event
@@ -64,28 +64,30 @@ class EventComponent(
       eParser       <- Resource.eval(EventParser())
       parserRef     <- Resource.eval(Ref[IO].of(eParser))
       parserUpdated <- Resource.eval(Ref[IO].of(false))
-        _           <- Resource.eval(sup.supervise(signal.discrete.drop(1).switchMap { eventStream => 
+      alertRef      <- Resource.eval(Ref[IO].of(true))
+      _             <- Resource.eval(sup.supervise(signal.discrete.drop(1).switchMap { eventStream => 
                         // making a new parser
                         val newParser = for {
                           parser <- EventParser()
                           _      <- parserRef.set(parser)
+                          _      <- alertRef.set(true)
                         } yield parser
 
-                        val alert: Stream[IO, Event] = eventStream.pull.uncons1.flatMap {
-                          case Some((el, strm)) =>
-                            Pull.output1(el)
-                          case None => 
+                        val parseEvents = Stream.eval(newParser).flatMap { parser =>
+                          eventStream.evalTap { event =>
+                            alertRef.set(false) >>
+                            parser.parse(event).handleErrorWith(IO.println) >> parserUpdated.set(true)
+                          }
+                        } 
+
+                        val alert = alertRef.get.flatMap { empty =>
+                          if (empty) {
                             dom.window.alert("No events returned from query.")
-                            Pull.done
-                        }.stream
-                        
-                        alert.flatMap { _ =>
-                          Stream.eval(newParser).flatMap { parser =>
-                            eventStream.evalTap(
-                              parser.parse(_).handleErrorWith(IO.println) >> parserUpdated.set(true)
-                            )
-                          } 
+                          }
+                          IO.unit
                         }
+
+                        parseEvents ++ Stream.eval(alert)
                       }.compile.drain).void)
       scrollRef     <- Resource.eval(Ref[IO].of(0.0))
       isTop         <- Resource.eval(Ref[IO].of(true))
