@@ -80,10 +80,9 @@ class EventComponent(
                         } 
 
                         val alert = alertRef.get.flatMap { empty =>
-                          if (empty) {
+                          IO {
                             dom.window.alert("No events returned from query.")
-                          }
-                          IO.unit
+                          }.whenA(empty)
                         }
 
                         parseEvents ++ Stream.eval(alert)
