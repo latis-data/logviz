@@ -63,18 +63,29 @@ class EventComponent(
       eParser       <- Resource.eval(EventParser())
       parserRef     <- Resource.eval(Ref[IO].of(eParser))
       parserUpdated <- Resource.eval(Ref[IO].of(false))
-        _           <- Resource.eval(sup.supervise(signal.discrete.switchMap { stream => 
+      alertRef      <- Resource.eval(Ref[IO].of(true))
+      _             <- Resource.eval(sup.supervise(signal.discrete.drop(1).switchMap { eventStream => 
                         // making a new parser
                         val newParser = for {
                           parser <- EventParser()
                           _      <- parserRef.set(parser)
+                          _      <- alertRef.set(true)
                         } yield parser
-                        
-                        Stream.eval(newParser).flatMap { parser =>
-                          stream.evalTap(
-                            parser.parse(_).handleErrorWith(IO.println) >> parserUpdated.set(true)
-                          )
+
+                        val parseEvents = Stream.eval(newParser).flatMap { parser =>
+                          eventStream.evalTap { event =>
+                            alertRef.set(false) >>
+                            parser.parse(event).handleErrorWith(IO.println) >> parserUpdated.set(true)
+                          }
                         } 
+
+                        val alert = alertRef.get.flatMap { empty =>
+                          IO {
+                            dom.window.alert("No events returned from query.")
+                          }.whenA(empty)
+                        }
+
+                        parseEvents ++ Stream.eval(alert)
                       }.compile.drain).void)
       scrollRef     <- Resource.eval(Ref[IO].of(0.0))
       isTop         <- Resource.eval(Ref[IO].of(true))
