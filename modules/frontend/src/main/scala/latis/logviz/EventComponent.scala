@@ -413,7 +413,7 @@ class EventComponent(
                                 val shortUrl = url.split("\\?")(0)
                                 EventDetails("Success", start, end, s"$duration ms", s"$shortUrl")
                               case RequestEvent.Failure(start, url, end, msg) => 
-                                val duration = Duration.between(LocalDateTime.parse(start), LocalDateTime.parse(end))
+                                val duration = Duration.between(LocalDateTime.parse(start), LocalDateTime.parse(end)).toMillis()
                                 EventDetails(s"Failure: $msg", start, end, s"$duration ms", url)
                               case RequestEvent.Partial(end, msg) =>
                                 if (msg.contains("msg: ")) {

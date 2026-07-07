@@ -207,6 +207,12 @@ object SplunkClient {
               else if line.contains("Ember-Server service bound to address:") then
                 val time = line.split(" INFO")(0).drop(1)
                 Some(Event.Start(time))
+              else if line.contains("Exception thrown during response") then
+                val spl = line.split("Exception")
+                val id = spl(0).split("request-id=")(1).dropRight(3)
+                val time = spl(0).split(" ERROR")(0).drop(1)
+                val msg = line.split(id)(1).drop(3)
+                Some(Event.Failure(id, time, msg))
               else
                 None
             }
