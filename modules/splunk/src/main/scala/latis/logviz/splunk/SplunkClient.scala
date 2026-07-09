@@ -172,7 +172,7 @@ object SplunkClient {
             * @param response the JSON results from the Splunk search
             * @return a stream of Event objects
             */
-          private def makeStream(response: Json): Stream[IO, Event] = { 
+          private def makeStream(response: Json, total: Int): Stream[IO, Event] = { 
             // making a stream of messages
             val decodedResult = response.hcursor.downField("results").as[List[SplunkMessage]]
             val mStrm: Stream[IO, SplunkMessage] = decodedResult match {
@@ -219,7 +219,13 @@ object SplunkClient {
 
             // stream of messages -> stream of events
             val eStrm: Stream[IO, Event] = mStrm.map(getEvent).unNone
-            eStrm
+
+            if (total >= 50000) {
+              val alertEvent = Event.Start("splunk max reached")
+              eStrm ++ Stream.emit(alertEvent)
+            } else {
+              eStrm
+            }
           }
 
           /** Queries Splunk with a given search and returns the events as a stream of Event objects
@@ -240,7 +246,7 @@ object SplunkClient {
                 _          <- waitLoop(authHeader, sid) // Step 3: Check the status of a query
                 total      <- getTotalResults(authHeader, sid)
                 res        <- getResults(authHeader, sid, total) // Step 4: Get the results from the query
-              } yield res
+              } yield (res, total)
             }.flatMap(makeStream) // Step 5: Make a stream of logs and get a stream of events
           }
 

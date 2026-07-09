@@ -6,6 +6,8 @@ import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 
+import scala.scalajs.js
+
 import org.scalajs.dom
 import org.scalajs.dom.HTMLElement
 import org.scalajs.dom.HTMLCanvasElement
@@ -63,6 +65,7 @@ class EventComponent(
       eParser       <- Resource.eval(EventParser())
       parserRef     <- Resource.eval(Ref[IO].of(eParser))
       parserUpdated <- Resource.eval(Ref[IO].of(false))
+      lineRef       <- Resource.eval(Ref[IO].of(false))
       alertRef      <- Resource.eval(Ref[IO].of(true))
       _             <- Resource.eval(sup.supervise(signal.discrete.drop(1).switchMap { eventStream => 
                         // making a new parser
@@ -72,12 +75,25 @@ class EventComponent(
                           _      <- alertRef.set(true)
                         } yield parser
 
-                        val parseEvents = Stream.eval(newParser).flatMap { parser =>
+                        val parseEvents = Stream.eval(newParser).flatMap { parser =>                          
                           eventStream.evalTap { event =>
+                            event match {
+                              case Event.Start("splunk max reached") =>
+                                val msg = "50,000 event limit from Splunk was reached, indicating a " +
+                                  "large time range or noise in logs. A dashed line was drawn where the " +
+                                  "last event was parsed."
+                                IO(dom.window.alert(msg)) >> lineRef.set(true)
+                              case _ =>
+                                IO.unit
+                            }
+                          }.dropLastIf {
+                            case Event.Start("splunk max reached") => true
+                            case _ => false
+                          }.evalTap { event =>
                             alertRef.set(false) >>
                             parser.parse(event).handleErrorWith(IO.println) >> parserUpdated.set(true)
                           }
-                        } 
+                        }
 
                         val alert = alertRef.get.flatMap { empty =>
                           IO {
@@ -101,7 +117,8 @@ class EventComponent(
                         isTop, 
                         rectRef,
                         prevZoomRef,
-                        parserUpdated)
+                        parserUpdated,
+                        lineRef)
       _             <- hover(canvas, eventRef, rectRef)
     } yield(timeline)
   
@@ -134,6 +151,8 @@ class EventComponent(
    * @param cols number of columns to draw
    * @param top   current scroll position from the top
    * @param width total available space for columns to be drawn
+   * @param line flag to draw a line at last event parsed
+   * @param lastEv the last event from the stream
   */
   private def drawCanvas(
     end: LocalDateTime,
@@ -143,7 +162,9 @@ class EventComponent(
     cols: Int,
     top: Double,
     width: Int,
-    pixelsPerSec: Double
+    pixelsPerSec: Double,
+    line: Boolean,
+    lastEv: List[Rectangle]
   ): IO[Unit] =
 
     //computes what the top of the canvas(viewport) is
@@ -186,6 +207,7 @@ class EventComponent(
             case Rectangle(event, x, y, width, height, color) => 
               drawRect(context, x, y, width, height, color)
             }
+      _ <- drawLine(context, width, lastEv).whenA(line)
     } yield()
 
 
@@ -205,6 +227,39 @@ class EventComponent(
       context.lineWidth = 0.3
       context.strokeStyle = "black"
       context.strokeRect(x, y, width, duration)
+  }
+
+  /**
+   * Draw a line denoting the last event drawn by Logviz
+   * 
+   * @param context
+   * @param width total available space for columns to be drawn
+   * @param lastRect the last event that will be drawn
+  */
+  private def drawLine(
+    context: dom.CanvasRenderingContext2D,
+    width: Int,
+    lastRect: List[Rectangle]
+  ): IO[Unit] = IO {
+    if (!lastRect.isEmpty) {
+      context.setLineDash(js.Array(10, 10))
+      context.beginPath()
+
+      val rect = lastRect(0)
+
+      rect.event._1 match {
+        case RequestEvent.Server(_) | RequestEvent.Request(_, _) =>
+          context.moveTo(150, rect.y)
+          context.lineTo(150 + width, rect.y)
+        case _ =>
+          context.moveTo(150, rect.y + rect.height)
+          context.lineTo(150 + width, rect.y + rect.height)
+      }
+
+      context.closePath()
+      context.stroke()
+      context.setLineDash(js.Array())
+    }
   }
   
   private def drawTS(
@@ -243,7 +298,8 @@ class EventComponent(
     isTop: Ref[IO, Boolean],
     rectRef: Ref[IO, List[Rectangle]],
     prevZoomRef: Ref[IO, Double],
-    parserUpdated: Ref[IO, Boolean]
+    parserUpdated: Ref[IO, Boolean],
+    lineRef: Ref[IO, Boolean]
   ): Resource[IO, Dispatcher[IO]] =
     Dispatcher.sequential[IO] evalTap{ dispatcher => 
 
@@ -260,6 +316,7 @@ class EventComponent(
           zoomLev     <- zoomRef.get
           parser      <- parserRef.get
           newParser   <- parserUpdated.get
+          drawLine    <- lineRef.get
 
           //if live, then possible scenarios: 
           //  - at top of canvas so continuously redrawing each animation frame
@@ -292,6 +349,14 @@ class EventComponent(
                                   }
                         maxCol  <- parser.getMaxConcurrent()
                         events  <- parser.getEvents()
+                        lastEv  <- parser.getLastEvent(events)
+                        lastRect = Rectangles.makeRectangles(end,
+                                    height,
+                                    newTop,
+                                    width/maxCol,
+                                    lastEv,
+                                    start,
+                                    zoomLev)
                         rects   = Rectangles.makeRectangles(endTime,
                                    height,
                                    newTop,
@@ -307,7 +372,9 @@ class EventComponent(
                                     maxCol,
                                     newTop,
                                     width,
-                                    zoomLev)
+                                    zoomLev,
+                                    drawLine,
+                                    lastRect)
                         _       <- prevScrollPos.update(_ => newTop)
                         _       <- if (newTop == 0.0) {
                                     isTop.update(_ => true)
@@ -336,6 +403,14 @@ class EventComponent(
                                   }
                           maxCol  <- parser.getMaxConcurrent()
                           events  <- parser.getEvents()
+                          lastEv  <- parser.getLastEvent(events)
+                          lastRect = Rectangles.makeRectangles(end,
+                                      height,
+                                      newTop,
+                                      width/maxCol,
+                                      lastEv,
+                                      start,
+                                      zoomLev)
                           rects   = Rectangles.makeRectangles(end,
                                     height,
                                     newTop,
@@ -351,7 +426,9 @@ class EventComponent(
                                       maxCol,
                                       newTop,
                                       width,
-                                      zoomLev)
+                                      zoomLev,
+                                      drawLine,
+                                      lastRect)
                           _       <- prevScrollPos.update(_ => newTop)
                           //_       <- prevEndRef.set(end)
                           _       <- prevZoomRef.set(zoomLev)

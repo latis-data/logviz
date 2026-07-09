@@ -1,5 +1,8 @@
 package latis.logviz
 
+import java.time.format.DateTimeFormatter
+import java.time.LocalDateTime
+
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.std.PQueue
@@ -13,6 +16,7 @@ trait EventParser {
   def getEvents(): IO[List[(RequestEvent, Int)]]
   def getMaxConcurrent(): IO[Int]
   def getUnusedColumn(pq: PQueue[IO, Column], acc: List[Column] = Nil): IO[Option[Column]]
+  def getLastEvent(lst: List[(RequestEvent, Int)]): IO[List[(RequestEvent, Int)]]
 }
 
 /**
@@ -271,6 +275,33 @@ object EventParser {
             //pq is empty: meaning no columns that are unused -> need to increase max number of columns
             acc.traverse(pq.offer(_))
             >> IO(None)
+        }
+
+      override def getLastEvent(reqEvents: List[(RequestEvent, Int)]): IO[List[(RequestEvent, Int)]] = 
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+
+        def getTime(ev: RequestEvent): LocalDateTime =
+          ev match {
+            case RequestEvent.Server(time) => LocalDateTime.parse(time, formatter)
+            case RequestEvent.Request(start, _) => LocalDateTime.parse(start, formatter)
+            case RequestEvent.Success(_, _, end, _) => LocalDateTime.parse(end, formatter)
+            case RequestEvent.Failure(_, _, end, _) => LocalDateTime.parse(end, formatter)
+            case RequestEvent.Partial(end, _) => LocalDateTime.parse(end, formatter)
+          }
+        
+        def latestTime(lst: List[(RequestEvent, Int)], curr: (RequestEvent, Int)): (RequestEvent, Int) = lst match {
+          case Nil => curr
+          case head :: tail => 
+            val time1 = getTime(curr._1)
+            val time2 = getTime(head._1)
+            latestTime(tail, if (time1.isAfter(time2)) curr else head)
+        }
+
+        reqEvents match {
+          case Nil => IO(List())
+          case head :: tail => IO {
+            List(latestTime(tail, head))
+          }
         }
     }
   }
