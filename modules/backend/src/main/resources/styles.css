@@ -52,11 +52,23 @@ input:valid+span::after {
 #start-time {
   display: flex;
   align-items: center;
+  height: auto;
+}
+
+#start-time p {
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 #end-time {
   display: flex;
   align-items: center;
+}
+
+#end-time p {
+  margin-top: 8px;
+  margin-bottom: 0
+  8px;
 }
 
 #time-range {

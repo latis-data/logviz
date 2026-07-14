@@ -79,12 +79,18 @@ object Main extends IOWebApp {
                         } yield ()
                       })
                     )
-      changeSource <- button(
+
+      updateSource<- button(
                         `type` := "button",
-                        "Reload Source",
+                        "Load Source",
                         onClick(_ =>
                           for {
-                            _ <- events.set(ec.getEvents)
+                            start <- startRef.get
+                            end   <- endRef.get
+                            inst  <- instanceRef.get
+                            live  <- liveRef.get
+                            _     <- (liveRef.set(false)).whenA(live)
+                            _     <- events.set(ec.getEvents(start.toString(), end.toString(), inst))
                           } yield ()
                         )
                       )
@@ -92,15 +98,16 @@ object Main extends IOWebApp {
       sup         <- Supervisor[IO](await=true)
 
       //any changes to any of these signallingrefs should trigger a getevents call
-      params      = (startRef.asInstanceOf[Signal[IO, LocalDateTime]], 
-                     endRef.asInstanceOf[Signal[IO, LocalDateTime]], 
-                     instanceRef.asInstanceOf[Signal[IO, String]],
-                     liveRef.asInstanceOf[Signal[IO, Boolean]]).mapN{
-                      (start, end, instance, live) => (start, end, instance)
-                    }
+      params      = liveRef.asInstanceOf[Signal[IO, Boolean]]
 
-      _           <- Resource.eval(sup.supervise(params.discrete.switchMap { (s, e, i) => 
-                        Stream.exec(events.set(ec.getEvents(s.toString(), e.toString(), i)))
+      _           <- Resource.eval(sup.supervise(params.discrete.drop(1).switchMap { _ => 
+                        Stream.exec(
+                          for {
+                            s      <- startRef.get
+                            e      <- endRef.get
+                            i      <- instanceRef.get
+                            strmIO <- events.set(ec.getEvents(s.toString(), e.toString(), i))
+                          } yield strmIO)
                   }.compile.drain).void)
 
       //probably don't need this anymore since we're combining signal in params
@@ -125,8 +132,8 @@ object Main extends IOWebApp {
       //                   } yield()
       //                 }.compile.drain).void)
 
-      timeRange   <- new TimeRangeComponent(startRef, endRef, liveRef).render
-      timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange)  
+      timeRange   <- new TimeRangeComponent(startRef, endRef).render
+      timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange, updateSource)  
 
       zoomRef     <- Resource.eval(Ref[IO].of(1.0))
       zoom        <- new ZoomComponent(zoomRef).render
