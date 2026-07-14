@@ -15,8 +15,7 @@ import fs2.dom.HtmlElement
 
 class TimeRangeComponent(
   startRef: SignallingRef[IO, LocalDateTime],
-  endRef: SignallingRef[IO, LocalDateTime],
-  liveRef: SignallingRef[IO, Boolean]
+  endRef: SignallingRef[IO, LocalDateTime]
 ) {
   val formatter= DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
   def render: Resource[IO, HtmlElement[IO]] =
@@ -73,10 +72,7 @@ class TimeRangeComponent(
                                 Either.catchOnly[DateTimeParseException](LocalDateTime.parse(v)) match
                                   case Left(value) => throw new IllegalArgumentException(
                                     "Invalid time") 
-                                  case Right(value) => {
-                                    liveRef.set(false) >>
-                                    endRef.set(value)
-                                  }
+                                  case Right(value) => endRef.set(value)
                               } else {
                                 IO.unit
                               }
@@ -86,7 +82,7 @@ class TimeRangeComponent(
                       },
                       span(cls := "validity")
                     )
-      test  <- div(idAttr:= "time-range", div(idAttr:= "time-selection", startInput, endInput))
+      test  <- div(idAttr:= "time-range", div(idAttr:= "time-range-selection", startInput, endInput))
 
     } yield(test)
   
