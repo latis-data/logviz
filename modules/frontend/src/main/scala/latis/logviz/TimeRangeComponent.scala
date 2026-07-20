@@ -26,7 +26,7 @@ class TimeRangeComponent(
       
       startInput  <- div(
                       idAttr := "start-time",
-                      p("Start: "),
+                      label("Start: "),
                       input.withSelf{ self => 
                         (
                           `type` := "datetime-local",
@@ -54,7 +54,7 @@ class TimeRangeComponent(
                     ) 
       endInput    <- div(
                       idAttr := "end-time",
-                      p("End: "),
+                      label("End: "),
                       input.withSelf{ self => 
                         (
                           idAttr := "end-time",

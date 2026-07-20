@@ -53,22 +53,14 @@ input:valid+span::after {
   display: flex;
   align-items: center;
   height: auto;
-}
-
-#start-time p {
-  margin-top: 8px;
   margin-bottom: 8px;
 }
 
 #end-time {
   display: flex;
   align-items: center;
-}
-
-#end-time p {
   margin-top: 8px;
-  margin-bottom: 0
-  8px;
+  margin-bottom: 8px;
 }
 
 #time-range {
@@ -116,6 +108,8 @@ input:valid+span::after {
 
 #instance {
   width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
 }
 
 .autocomplete-panel {

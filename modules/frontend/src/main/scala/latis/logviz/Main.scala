@@ -7,7 +7,6 @@ import calico.IOWebApp
 import calico.html.io.{*, given}
 import cats.effect.IO
 import cats.effect.Resource
-import cats.syntax.all.*
 import fs2.Stream
 import cats.effect.kernel.Ref
 import fs2.concurrent.SignallingRef
@@ -82,14 +81,13 @@ object Main extends IOWebApp {
 
       updateSource<- button(
                         `type` := "button",
-                        "Load Source",
+                        "Load Events",
                         onClick(_ =>
                           for {
                             start <- startRef.get
                             end   <- endRef.get
                             inst  <- instanceRef.get
-                            live  <- liveRef.get
-                            _     <- (liveRef.set(false)).whenA(live)
+                            _     <- liveRef.set(false)
                             _     <- events.set(ec.getEvents(start.toString(), end.toString(), inst))
                           } yield ()
                         )
@@ -133,7 +131,7 @@ object Main extends IOWebApp {
       //                 }.compile.drain).void)
 
       timeRange   <- new TimeRangeComponent(startRef, endRef).render
-      timeSelect  <- div(idAttr:= "time-selection", liveButton, timeRange, updateSource)  
+      timeSelect  <- div(idAttr:= "time-selection", timeRange, updateSource)  
 
       zoomRef     <- Resource.eval(Ref[IO].of(1.0))
       zoom        <- new ZoomComponent(zoomRef).render
