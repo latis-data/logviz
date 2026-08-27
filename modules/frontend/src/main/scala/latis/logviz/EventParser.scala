@@ -121,7 +121,7 @@ object EventParser {
                               currDepth) +: lst)
                             >> IO(currDepth)
 
-                          case Some((RequestEvent.Partial(start, status), currDepth)) =>
+                          case Some((RequestEvent.Partial(_, status), currDepth)) =>
                             val successTime = LocalDateTime.parse(time)
                             // if we should have had a partial request event and we don't, discard, otherwise update the partial event 
                             val eventStart = successTime.minus(duration, ChronoUnit.MILLIS)
@@ -179,7 +179,7 @@ object EventParser {
                               (RequestEvent.Failure(start, url, time, msg), 
                               currDepth) +: lst)
                             >> IO(currDepth)
-                          case Some((RequestEvent.Partial(start, status), currDepth)) =>
+                          case Some((RequestEvent.Partial(_, status), currDepth)) =>
                             compEventsRef.update(lst =>
                               (RequestEvent.Partial(time, s"failed event with response status of: $status, error msg: $msg"), 
                               currDepth) +: lst)

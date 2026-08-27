@@ -59,7 +59,7 @@ object Main extends IOWebApp {
                           _     <- if (!live) {
                                       //going from live to not live: visually it'll look like the canvas stopped moving
                                       //so endtime should just be where we left off
-                                      endRef.update(t => LocalDateTime.now(ZoneOffset.UTC))
+                                      endRef.update(_ => LocalDateTime.now(ZoneOffset.UTC))
                                       
                                     } else {
                                       IO.unit
