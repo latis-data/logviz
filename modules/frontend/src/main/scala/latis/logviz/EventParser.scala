@@ -157,7 +157,7 @@ object EventParser {
                                             case None => IO.raiseError(new Exception(
                                               "No unused column available. Increase number of columns!!!"))
                                           }
-                              c         <- colCounter.updateAndGet(c => c + 1)
+                              _         <- colCounter.updateAndGet(c => c + 1)
                               _         <- maxCounter.update(prev => math.max(prev, currDepth.number + 1)) // maxCounter is 1-indexed
                               _         <- compEventsRef.update(lst => 
                                             (RequestEvent.Partial(time, s"partial success event- start time unknown. duration: $duration"), 
