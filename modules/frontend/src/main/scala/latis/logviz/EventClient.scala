@@ -99,7 +99,7 @@ object EventClient {
           val uri = Uri.unsafeFromString(s"${baseUri}instances")
           val request = Request[IO](method = Method.GET, uri = uri)
 
-          http.expect(request)(jsonOf[IO, List[String]])
+          http.expect(request)(using jsonOf[IO, List[String]])
         }
       }
     }
